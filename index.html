@@ -1,0 +1,1607 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Timeline Generator</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+    <style>
+        [v-cloak] { display: none; }
+        .phase-bar { transition: all 0.2s ease; }
+        .phase-bar:hover { filter: brightness(1.1); cursor: pointer; }
+        .milestone-icon { transition: transform 0.2s ease; }
+        .milestone-icon:hover { transform: scale(1.1); cursor: pointer; }
+        .row-hover:hover { background-color: rgba(0,0,0,0.02); }
+        .grid-line { stroke: #D1D5DB; stroke-width: 1; }
+        .grid-line-light { stroke: #E5E7EB; stroke-width: 0.5; }
+
+        /* Gestrichelte Puffer-Linie */
+        .buffer-line {
+            stroke-dasharray: 8, 4;
+            stroke-width: 3;
+            fill: none;
+        }
+
+        /* Kritischer Pfad Markierung */
+        .critical-marker {
+            stroke: #991B1B;
+            stroke-width: 2;
+        }
+
+        /* Heute-Linie */
+        .today-line {
+            stroke: #1F2937;
+            stroke-width: 2;
+        }
+
+        /* Drag & Drop Styles */
+        .draggable-item {
+            cursor: grab;
+            transition: all 0.2s ease;
+        }
+        .draggable-item:active { cursor: grabbing; }
+        .draggable-item.dragging {
+            opacity: 0.5;
+            transform: scale(0.98);
+        }
+        .draggable-item.drag-over {
+            border-color: #3B82F6 !important;
+            border-style: dashed !important;
+            background-color: #EFF6FF !important;
+        }
+        .drag-handle {
+            cursor: grab;
+            color: #9CA3AF;
+            user-select: none;
+        }
+        .drag-handle:hover { color: #6B7280; }
+        .drag-handle:active { cursor: grabbing; }
+
+        /* Print/Export Styles */
+        @media print {
+            .no-print { display: none !important; }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div id="app" v-cloak>
+        <div class="flex h-screen">
+            <!-- Sidebar -->
+            <aside class="w-64 bg-white border-r border-gray-200 flex flex-col no-print">
+                <div class="p-4 border-b border-gray-200">
+                    <h1 class="text-xl font-semibold text-gray-800">Timeline Generator</h1>
+                </div>
+
+                <!-- Projektliste -->
+                <div class="flex-1 overflow-y-auto p-4">
+                    <div class="flex items-center justify-between mb-3">
+                        <h2 class="text-sm font-medium text-gray-600">Projekte</h2>
+                        <button @click="createProject" class="text-blue-600 hover:text-blue-800 text-sm font-medium">+ Neu</button>
+                    </div>
+                    <div class="space-y-1">
+                        <div v-for="project in projects" :key="project.id"
+                             @click="selectProject(project.id)"
+                             :class="['p-2 rounded cursor-pointer text-sm',
+                                      currentProject?.id === project.id ? 'bg-blue-50 text-blue-700 border border-blue-200' : 'hover:bg-gray-50 text-gray-700']">
+                            <div class="font-medium truncate">{{ project.projekt.name }}</div>
+                            <div class="text-xs text-gray-500">{{ formatDateShort(project.projekt.start) }} - {{ formatDateShort(project.projekt.ende) }}</div>
+                        </div>
+                        <div v-if="projects.length === 0" class="text-gray-400 text-sm p-2">
+                            Keine Projekte vorhanden
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Projekt-Aktionen -->
+                <div v-if="currentProject" class="p-4 border-t border-gray-200 space-y-1">
+                    <button @click="duplicateProject" class="w-full text-left text-sm text-gray-600 hover:text-gray-800 p-2 hover:bg-gray-50 rounded">
+                        Duplizieren
+                    </button>
+                    <button @click="saveAsTemplate" class="w-full text-left text-sm text-gray-600 hover:text-gray-800 p-2 hover:bg-gray-50 rounded">
+                        Als Vorlage speichern
+                    </button>
+                    <button @click="deleteProject" class="w-full text-left text-sm text-red-500 hover:text-red-700 p-2 hover:bg-red-50 rounded">
+                        Löschen
+                    </button>
+                </div>
+
+                <!-- Vorlagen -->
+                <div class="p-4 border-t border-gray-200">
+                    <div class="flex items-center justify-between mb-2">
+                        <h2 class="text-sm font-medium text-gray-600">Vorlagen</h2>
+                        <button @click="showTemplatesModal = true" class="text-gray-400 hover:text-gray-600 text-xs">Verwalten</button>
+                    </div>
+                    <div class="space-y-1">
+                        <div v-for="template in templates" :key="template.id"
+                             @click="createFromTemplate(template)"
+                             class="p-2 rounded cursor-pointer text-sm hover:bg-green-50 text-gray-600 hover:text-green-700 border border-dashed border-gray-300 hover:border-green-400">
+                            <div class="flex items-center space-x-2">
+                                <span class="text-green-600">+</span>
+                                <span class="truncate">{{ template.name }}</span>
+                            </div>
+                        </div>
+                        <div v-if="templates.length === 0" class="text-gray-400 text-xs p-2">
+                            Keine Vorlagen gespeichert
+                        </div>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Main Content -->
+            <main class="flex-1 flex flex-col overflow-hidden">
+                <!-- Toolbar -->
+                <header class="bg-white border-b border-gray-200 p-4 flex items-center justify-between no-print">
+                    <div class="flex items-center space-x-4">
+                        <select v-model="activeTab" class="border border-gray-300 rounded px-3 py-1.5 text-sm bg-white">
+                            <option value="projekt">Projekt</option>
+                            <option value="gruppen">Gruppen</option>
+                            <option value="elemente">Phasen & Meilensteine</option>
+                        </select>
+                        <div class="flex items-center space-x-2" v-if="currentProject">
+                            <label class="text-sm text-gray-600">Zeitskala:</label>
+                            <select v-model="currentProject.einstellungen.zeitskala" @change="saveToStorage" class="border border-gray-300 rounded px-2 py-1 text-sm bg-white">
+                                <option value="monat">Monate</option>
+                                <option value="quartal">Quartale</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <button @click="showExportModal = true" class="bg-red-700 text-white px-4 py-1.5 rounded text-sm hover:bg-red-800 font-medium">
+                            Export
+                        </button>
+                        <button @click="showImportExportModal = true" class="border border-gray-300 px-3 py-1.5 rounded text-sm hover:bg-gray-50">
+                            JSON
+                        </button>
+                    </div>
+                </header>
+
+                <div v-if="!currentProject" class="flex-1 flex items-center justify-center text-gray-400">
+                    <div class="text-center">
+                        <p class="text-lg mb-4">Kein Projekt ausgewählt</p>
+                        <button @click="createProject" class="text-blue-600 hover:text-blue-800 font-medium">+ Neues Projekt erstellen</button>
+                    </div>
+                </div>
+
+                <div v-else class="flex-1 flex overflow-hidden">
+                    <!-- Editor Panel -->
+                    <div class="w-96 border-r border-gray-200 bg-white overflow-y-auto p-4 no-print">
+                        <!-- Projekt Tab -->
+                        <div v-if="activeTab === 'projekt'" class="space-y-4">
+                            <h3 class="font-semibold text-gray-800">Projekt-Einstellungen</h3>
+                            <div>
+                                <label class="block text-sm text-gray-600 mb-1">Projektname</label>
+                                <input v-model="currentProject.projekt.name" @input="saveToStorage" type="text" class="w-full border border-gray-300 rounded px-3 py-2 text-sm">
+                            </div>
+                            <div>
+                                <label class="block text-sm text-gray-600 mb-1">Beschreibung</label>
+                                <textarea v-model="currentProject.projekt.beschreibung" @input="saveToStorage" rows="2" class="w-full border border-gray-300 rounded px-3 py-2 text-sm"></textarea>
+                            </div>
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-sm text-gray-600 mb-1">Projektstart</label>
+                                    <input v-model="currentProject.projekt.start" @input="saveToStorage" type="date" class="w-full border border-gray-300 rounded px-3 py-2 text-sm">
+                                </div>
+                                <div>
+                                    <label class="block text-sm text-gray-600 mb-1">Projektende</label>
+                                    <input v-model="currentProject.projekt.ende" @input="saveToStorage" type="date" class="w-full border border-gray-300 rounded px-3 py-2 text-sm">
+                                </div>
+                            </div>
+                            <div class="pt-2 space-y-2">
+                                <label class="flex items-center space-x-2">
+                                    <input type="checkbox" v-model="currentProject.einstellungen.heuteAnzeigen" @change="saveToStorage" class="rounded">
+                                    <span class="text-sm text-gray-600">Heute-Linie anzeigen</span>
+                                </label>
+                                <label class="flex items-center space-x-2">
+                                    <input type="checkbox" v-model="currentProject.einstellungen.legendeAnzeigen" @change="saveToStorage" class="rounded">
+                                    <span class="text-sm text-gray-600">Legende anzeigen</span>
+                                </label>
+                            </div>
+
+                            <!-- Farb-Kategorien -->
+                            <div class="pt-4 border-t border-gray-200">
+                                <h4 class="text-sm font-medium text-gray-700 mb-3">Farb-Kategorien</h4>
+                                <div class="space-y-2">
+                                    <div class="flex items-center space-x-2">
+                                        <div class="w-6 h-6 rounded" style="background-color: #166534;"></div>
+                                        <input v-model="currentProject.einstellungen.farbNamen.gruen" @input="saveToStorage"
+                                               type="text" placeholder="Name für Grün"
+                                               class="flex-1 border border-gray-300 rounded px-2 py-1 text-sm">
+                                    </div>
+                                    <div class="flex items-center space-x-2">
+                                        <div class="w-6 h-6 rounded" style="background-color: #991B1B;"></div>
+                                        <input v-model="currentProject.einstellungen.farbNamen.rot" @input="saveToStorage"
+                                               type="text" placeholder="Name für Rot"
+                                               class="flex-1 border border-gray-300 rounded px-2 py-1 text-sm">
+                                    </div>
+                                    <div class="flex items-center space-x-2">
+                                        <div class="w-6 h-6 rounded" style="background-color: #450a0a;"></div>
+                                        <input v-model="currentProject.einstellungen.farbNamen.dunkelrot" @input="saveToStorage"
+                                               type="text" placeholder="Name für Dunkelrot"
+                                               class="flex-1 border border-gray-300 rounded px-2 py-1 text-sm">
+                                    </div>
+                                </div>
+                                <p class="text-xs text-gray-500 mt-2">Diese Namen erscheinen in der Legende.</p>
+                            </div>
+                        </div>
+
+                        <!-- Gruppen Tab -->
+                        <div v-if="activeTab === 'gruppen'" class="space-y-4">
+                            <div class="flex items-center justify-between">
+                                <h3 class="font-semibold text-gray-800">Gruppen</h3>
+                                <button @click="addGruppe" class="text-blue-600 hover:text-blue-800 text-sm font-medium">+ Gruppe</button>
+                            </div>
+                            <p class="text-xs text-gray-500">Gruppen sind Überschriften, die Phasen und Meilensteine organisieren.</p>
+                            <div class="space-y-2">
+                                <div v-for="(gruppe, index) in sortedGruppen" :key="gruppe.id"
+                                     class="border border-gray-200 rounded p-3 bg-gray-50">
+                                    <div class="flex items-center space-x-2 mb-2">
+                                        <input v-model="gruppe.name" @input="saveToStorage" type="text" placeholder="Gruppenname" class="flex-1 border border-gray-300 rounded px-2 py-1.5 text-sm font-medium">
+                                    </div>
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex items-center space-x-1">
+                                            <button @click="moveGruppe(gruppe, -1)" :disabled="index === 0" class="text-gray-400 hover:text-gray-600 disabled:opacity-30 p-1 text-sm">↑</button>
+                                            <button @click="moveGruppe(gruppe, 1)" :disabled="index === sortedGruppen.length - 1" class="text-gray-400 hover:text-gray-600 disabled:opacity-30 p-1 text-sm">↓</button>
+                                        </div>
+                                        <button @click="deleteGruppe(gruppe.id)" class="text-red-400 hover:text-red-600 text-xs">Löschen</button>
+                                    </div>
+                                </div>
+                                <div v-if="currentProject.gruppen.length === 0" class="text-gray-400 text-sm p-2 text-center">
+                                    Keine Gruppen vorhanden
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Elemente Tab -->
+                        <div v-if="activeTab === 'elemente'" class="space-y-4">
+                            <div class="flex items-center justify-between">
+                                <h3 class="font-semibold text-gray-800">Phasen & Meilensteine</h3>
+                                <div class="flex space-x-2">
+                                    <button @click="addElement('phase')" class="text-blue-600 hover:text-blue-800 text-sm font-medium">+ Phase</button>
+                                    <button @click="addElement('meilenstein')" class="text-green-600 hover:text-green-800 text-sm font-medium">+ Meilenstein</button>
+                                </div>
+                            </div>
+
+                            <!-- Elemente nach Gruppen sortiert -->
+                            <div v-for="gruppe in sortedGruppen" :key="'grp-' + gruppe.id" class="space-y-2">
+                                <div class="text-sm font-semibold text-gray-700 border-b border-gray-200 pb-1">{{ gruppe.name }}</div>
+                                <div v-for="element in getElementeForGruppe(gruppe.id)" :key="element.id"
+                                     draggable="true"
+                                     @dragstart="onDragStart($event, element)"
+                                     @dragover="onDragOver($event, element)"
+                                     @dragleave="onDragLeave($event)"
+                                     @drop="onDrop($event, element)"
+                                     @dragend="onDragEnd($event)"
+                                     :class="['border border-gray-200 rounded p-3 bg-white draggable-item', dragOverId === element.id ? 'drag-over' : '']">
+                                    <div class="flex items-center space-x-2 mb-2">
+                                        <span class="drag-handle text-lg leading-none" title="Ziehen zum Verschieben">⋮⋮</span>
+                                        <span :class="element.typ === 'phase' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'" class="text-xs px-2 py-0.5 rounded">
+                                            {{ element.typ === 'phase' ? 'Phase' : 'Meilenstein' }}
+                                        </span>
+                                        <input v-model="element.name" @input="saveToStorage" type="text" placeholder="Name" class="flex-1 border border-gray-300 rounded px-2 py-1 text-sm">
+                                    </div>
+
+                                    <!-- Gruppe und Einrückung -->
+                                    <div class="grid grid-cols-2 gap-2 mb-2">
+                                        <div>
+                                            <label class="text-xs text-gray-500">Gruppe</label>
+                                            <select v-model="element.gruppe" @change="saveToStorage" class="w-full border border-gray-300 rounded px-2 py-1 text-sm bg-white">
+                                                <option value="">-- Keine Gruppe --</option>
+                                                <option v-for="g in sortedGruppen" :key="g.id" :value="g.id">{{ g.name }}</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label class="text-xs text-gray-500">Einrückung</label>
+                                            <select v-model.number="element.einrueckung" @change="saveToStorage" class="w-full border border-gray-300 rounded px-2 py-1 text-sm bg-white">
+                                                <option :value="0">Ebene 1</option>
+                                                <option :value="1">Ebene 2 (eingerückt)</option>
+                                                <option :value="2">Ebene 3 (stark eingerückt)</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <!-- Phase-spezifische Felder -->
+                                    <div v-if="element.typ === 'phase'">
+                                        <div class="grid grid-cols-2 gap-2 mb-2">
+                                            <div>
+                                                <label class="text-xs text-gray-500">Start</label>
+                                                <input v-model="element.start" @input="saveToStorage" type="date" class="w-full border border-gray-300 rounded px-2 py-1 text-sm">
+                                            </div>
+                                            <div>
+                                                <label class="text-xs text-gray-500">Ende</label>
+                                                <input v-model="element.ende" @input="saveToStorage" type="date" class="w-full border border-gray-300 rounded px-2 py-1 text-sm">
+                                            </div>
+                                        </div>
+                                        <div class="flex items-center space-x-4 mb-2">
+                                            <label class="flex items-center space-x-1">
+                                                <input type="checkbox" v-model="element.kritisch" @change="saveToStorage" class="rounded">
+                                                <span class="text-xs text-gray-600">Kritischer Pfad</span>
+                                            </label>
+                                            <div class="flex items-center space-x-1">
+                                                <label class="text-xs text-gray-600">Puffer:</label>
+                                                <input v-model.number="element.pufferTage" @input="saveToStorage" type="number" min="0" class="w-14 border border-gray-300 rounded px-2 py-1 text-sm">
+                                                <span class="text-xs text-gray-500">Tage</span>
+                                            </div>
+                                        </div>
+                                        <div class="flex items-center space-x-2">
+                                            <label class="text-xs text-gray-600">Kategorie:</label>
+                                            <button @click="element.farbe = 'gruen'; saveToStorage()"
+                                                    :title="currentProject.einstellungen.farbNamen?.gruen || 'Vorbereitung'"
+                                                    :class="['w-6 h-6 rounded border-2 cursor-pointer', element.farbe === 'gruen' ? 'border-gray-800' : 'border-transparent hover:border-gray-400']"
+                                                    style="background-color: #166534;"></button>
+                                            <button @click="element.farbe = 'rot'; saveToStorage()"
+                                                    :title="currentProject.einstellungen.farbNamen?.rot || 'Plandauer'"
+                                                    :class="['w-6 h-6 rounded border-2 cursor-pointer', element.farbe === 'rot' ? 'border-gray-800' : 'border-transparent hover:border-gray-400']"
+                                                    style="background-color: #991B1B;"></button>
+                                            <button @click="element.farbe = 'dunkelrot'; saveToStorage()"
+                                                    :title="currentProject.einstellungen.farbNamen?.dunkelrot || 'Kritisch'"
+                                                    :class="['w-6 h-6 rounded border-2 cursor-pointer', element.farbe === 'dunkelrot' ? 'border-gray-800' : 'border-transparent hover:border-gray-400']"
+                                                    style="background-color: #450a0a;"></button>
+                                            <span class="text-xs text-gray-400 ml-1">{{ currentProject.einstellungen.farbNamen?.[element.farbe] || '' }}</span>
+                                        </div>
+                                    </div>
+
+                                    <!-- Meilenstein-spezifische Felder -->
+                                    <div v-if="element.typ === 'meilenstein'">
+                                        <div class="mb-2">
+                                            <label class="text-xs text-gray-500">Datum</label>
+                                            <input v-model="element.datum" @input="saveToStorage" type="date" class="w-full border border-gray-300 rounded px-2 py-1 text-sm">
+                                        </div>
+                                    </div>
+
+                                    <div class="flex justify-between items-center mt-2 pt-2 border-t border-gray-100">
+                                        <div class="flex items-center space-x-1">
+                                            <button @click="moveElement(element, -1)" class="text-gray-400 hover:text-gray-600 p-1 text-sm">↑</button>
+                                            <button @click="moveElement(element, 1)" class="text-gray-400 hover:text-gray-600 p-1 text-sm">↓</button>
+                                        </div>
+                                        <button @click="deleteElement(element.id)" class="text-red-400 hover:text-red-600 text-xs">Löschen</button>
+                                    </div>
+                                </div>
+                                <div v-if="getElementeForGruppe(gruppe.id).length === 0" class="text-gray-400 text-xs p-2 text-center">
+                                    Keine Elemente
+                                </div>
+                            </div>
+
+                            <!-- Elemente ohne Gruppe -->
+                            <div v-if="getElementeForGruppe('').length > 0" class="space-y-2">
+                                <div class="text-sm font-semibold text-gray-500 border-b border-gray-200 pb-1">Ohne Gruppe</div>
+                                <div v-for="element in getElementeForGruppe('')" :key="element.id"
+                                     draggable="true"
+                                     @dragstart="onDragStart($event, element)"
+                                     @dragover="onDragOver($event, element)"
+                                     @dragleave="onDragLeave($event)"
+                                     @drop="onDrop($event, element)"
+                                     @dragend="onDragEnd($event)"
+                                     :class="['border border-gray-200 rounded p-3 bg-white draggable-item', dragOverId === element.id ? 'drag-over' : '']">
+                                    <!-- Same content as above -->
+                                    <div class="flex items-center space-x-2 mb-2">
+                                        <span class="drag-handle text-lg leading-none" title="Ziehen zum Verschieben">⋮⋮</span>
+                                        <span :class="element.typ === 'phase' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'" class="text-xs px-2 py-0.5 rounded">
+                                            {{ element.typ === 'phase' ? 'Phase' : 'Meilenstein' }}
+                                        </span>
+                                        <input v-model="element.name" @input="saveToStorage" type="text" placeholder="Name" class="flex-1 border border-gray-300 rounded px-2 py-1 text-sm">
+                                    </div>
+                                    <div class="grid grid-cols-2 gap-2 mb-2">
+                                        <div>
+                                            <label class="text-xs text-gray-500">Gruppe</label>
+                                            <select v-model="element.gruppe" @change="saveToStorage" class="w-full border border-gray-300 rounded px-2 py-1 text-sm bg-white">
+                                                <option value="">-- Keine Gruppe --</option>
+                                                <option v-for="g in sortedGruppen" :key="g.id" :value="g.id">{{ g.name }}</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label class="text-xs text-gray-500">Einrückung</label>
+                                            <select v-model.number="element.einrueckung" @change="saveToStorage" class="w-full border border-gray-300 rounded px-2 py-1 text-sm bg-white">
+                                                <option :value="0">Ebene 1</option>
+                                                <option :value="1">Ebene 2 (eingerückt)</option>
+                                                <option :value="2">Ebene 3 (stark eingerückt)</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div v-if="element.typ === 'phase'">
+                                        <div class="grid grid-cols-2 gap-2 mb-2">
+                                            <div>
+                                                <label class="text-xs text-gray-500">Start</label>
+                                                <input v-model="element.start" @input="saveToStorage" type="date" class="w-full border border-gray-300 rounded px-2 py-1 text-sm">
+                                            </div>
+                                            <div>
+                                                <label class="text-xs text-gray-500">Ende</label>
+                                                <input v-model="element.ende" @input="saveToStorage" type="date" class="w-full border border-gray-300 rounded px-2 py-1 text-sm">
+                                            </div>
+                                        </div>
+                                        <div class="flex items-center space-x-4 mb-2">
+                                            <label class="flex items-center space-x-1">
+                                                <input type="checkbox" v-model="element.kritisch" @change="saveToStorage" class="rounded">
+                                                <span class="text-xs text-gray-600">Kritischer Pfad</span>
+                                            </label>
+                                            <div class="flex items-center space-x-1">
+                                                <label class="text-xs text-gray-600">Puffer:</label>
+                                                <input v-model.number="element.pufferTage" @input="saveToStorage" type="number" min="0" class="w-14 border border-gray-300 rounded px-2 py-1 text-sm">
+                                                <span class="text-xs text-gray-500">Tage</span>
+                                            </div>
+                                        </div>
+                                        <div class="flex items-center space-x-2">
+                                            <label class="text-xs text-gray-600">Kategorie:</label>
+                                            <button @click="element.farbe = 'gruen'; saveToStorage()"
+                                                    :title="currentProject.einstellungen.farbNamen?.gruen || 'Vorbereitung'"
+                                                    :class="['w-6 h-6 rounded border-2 cursor-pointer', element.farbe === 'gruen' ? 'border-gray-800' : 'border-transparent hover:border-gray-400']"
+                                                    style="background-color: #166534;"></button>
+                                            <button @click="element.farbe = 'rot'; saveToStorage()"
+                                                    :title="currentProject.einstellungen.farbNamen?.rot || 'Plandauer'"
+                                                    :class="['w-6 h-6 rounded border-2 cursor-pointer', element.farbe === 'rot' ? 'border-gray-800' : 'border-transparent hover:border-gray-400']"
+                                                    style="background-color: #991B1B;"></button>
+                                            <button @click="element.farbe = 'dunkelrot'; saveToStorage()"
+                                                    :title="currentProject.einstellungen.farbNamen?.dunkelrot || 'Kritisch'"
+                                                    :class="['w-6 h-6 rounded border-2 cursor-pointer', element.farbe === 'dunkelrot' ? 'border-gray-800' : 'border-transparent hover:border-gray-400']"
+                                                    style="background-color: #450a0a;"></button>
+                                            <span class="text-xs text-gray-400 ml-1">{{ currentProject.einstellungen.farbNamen?.[element.farbe] || '' }}</span>
+                                        </div>
+                                    </div>
+                                    <div v-if="element.typ === 'meilenstein'">
+                                        <div class="mb-2">
+                                            <label class="text-xs text-gray-500">Datum</label>
+                                            <input v-model="element.datum" @input="saveToStorage" type="date" class="w-full border border-gray-300 rounded px-2 py-1 text-sm">
+                                        </div>
+                                    </div>
+                                    <div class="flex justify-between items-center mt-2 pt-2 border-t border-gray-100">
+                                        <div class="flex items-center space-x-1">
+                                            <button @click="moveElement(element, -1)" class="text-gray-400 hover:text-gray-600 p-1 text-sm">↑</button>
+                                            <button @click="moveElement(element, 1)" class="text-gray-400 hover:text-gray-600 p-1 text-sm">↓</button>
+                                        </div>
+                                        <button @click="deleteElement(element.id)" class="text-red-400 hover:text-red-600 text-xs">Löschen</button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div v-if="currentProject.elemente.length === 0" class="text-gray-400 text-sm p-4 text-center border border-dashed border-gray-300 rounded">
+                                Keine Phasen oder Meilensteine vorhanden.<br>
+                                Erstellen Sie zuerst Gruppen, dann fügen Sie Elemente hinzu.
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Timeline Canvas -->
+                    <div class="flex-1 overflow-auto bg-gray-200 p-6">
+                        <div ref="timelineContainer" class="bg-white shadow-lg" :style="{ minWidth: canvasWidth + 'px' }">
+                            <!-- Legende -->
+                            <div v-if="currentProject.einstellungen.legendeAnzeigen" class="px-6 pt-4 pb-2 border-b border-gray-200 flex items-center flex-wrap gap-x-6 gap-y-2 text-xs">
+                                <!-- Dynamische Farb-Kategorien -->
+                                <template v-for="color in usedColors" :key="color.key">
+                                    <div class="flex items-center space-x-2">
+                                        <div class="w-8 h-3 rounded-sm" :style="{ backgroundColor: color.hex }"></div>
+                                        <span class="text-gray-600">{{ color.name }}</span>
+                                    </div>
+                                </template>
+                                <div v-if="hasBuffer" class="flex items-center space-x-2">
+                                    <svg width="32" height="12"><line x1="0" y1="6" x2="32" y2="6" stroke="#991B1B" stroke-width="3" stroke-dasharray="8,4"/></svg>
+                                    <span class="text-gray-600">Zeitreserve</span>
+                                </div>
+                                <div v-if="hasMilestones" class="flex items-center space-x-2">
+                                    <svg width="16" height="16" viewBox="0 0 16 16"><polygon points="8,2 14,8 8,14 2,8" fill="none" stroke="#991B1B" stroke-width="1.5"/></svg>
+                                    <span class="text-gray-600">Meilenstein</span>
+                                </div>
+                                <div v-if="hasCritical" class="flex items-center space-x-2">
+                                    <div class="w-0.5 h-4 bg-gray-800"></div>
+                                    <span class="text-gray-600">Kritischer Pfad</span>
+                                </div>
+                            </div>
+
+                            <svg ref="timelineSvg" :width="canvasWidth" :height="canvasHeight" class="timeline-svg">
+                                <!-- Hintergrund -->
+                                <rect x="0" y="0" :width="canvasWidth" :height="canvasHeight" fill="#F9FAFB"/>
+
+                                <!-- Zeitachse Header - Jahr -->
+                                <g class="time-axis-year">
+                                    <rect :x="labelWidth" y="0" :width="canvasWidth - labelWidth" height="24" fill="#F3F4F6"/>
+                                    <template v-for="(year, index) in yearPeriods" :key="'y-' + index">
+                                        <text v-if="year.showLabel" :x="year.labelX" y="16" text-anchor="middle" font-size="13" font-weight="600" fill="#374151">
+                                            {{ year.label }}
+                                        </text>
+                                        <line v-if="index > 0" :x1="year.x" y1="0" :x2="year.x" y2="24" stroke="#D1D5DB" stroke-width="1"/>
+                                    </template>
+                                </g>
+
+                                <!-- Zeitachse Header - Monate -->
+                                <g class="time-axis-months">
+                                    <rect :x="labelWidth" y="24" :width="canvasWidth - labelWidth" height="24" fill="#F9FAFB"/>
+                                    <line :x1="labelWidth" y1="24" :x2="canvasWidth" y2="24" stroke="#D1D5DB" stroke-width="1"/>
+                                    <template v-for="(period, index) in timePeriods" :key="'m-' + index">
+                                        <text :x="period.x + period.width/2" y="40" text-anchor="middle" font-size="11" fill="#6B7280">
+                                            {{ period.label }}
+                                        </text>
+                                        <line :x1="period.x" y1="24" :x2="period.x" :y2="canvasHeight" class="grid-line-light"/>
+                                    </template>
+                                </g>
+
+                                <!-- Thema Label -->
+                                <g class="theme-label">
+                                    <rect x="0" y="0" :width="labelWidth" height="48" fill="#F3F4F6"/>
+                                    <text x="12" y="32" font-size="13" font-weight="600" fill="#374151">Thema</text>
+                                    <line x1="0" y1="48" :x2="canvasWidth" y2="48" stroke="#D1D5DB" stroke-width="1"/>
+                                    <line :x1="labelWidth" y1="0" :x2="labelWidth" :y2="canvasHeight" stroke="#D1D5DB" stroke-width="1"/>
+                                </g>
+
+                                <!-- Heute-Markierung oben -->
+                                <g v-if="currentProject.einstellungen.heuteAnzeigen && todayX >= labelWidth" class="today-marker">
+                                    <rect :x="todayX - 25" y="2" width="50" height="18" fill="#991B1B" rx="2"/>
+                                    <text :x="todayX" y="14" text-anchor="middle" font-size="10" fill="white" font-weight="500">Heute</text>
+                                </g>
+
+                                <!-- Content Rows -->
+                                <g class="content-rows" transform="translate(0, 48)">
+                                    <template v-for="(row, rowIndex) in timelineRows" :key="'row-' + rowIndex">
+                                        <!-- Row Background -->
+                                        <rect x="0" :y="rowIndex * rowHeight" :width="canvasWidth" :height="rowHeight"
+                                              :fill="rowIndex % 2 === 0 ? '#FFFFFF' : '#FAFAFA'" class="row-hover"/>
+                                        <line x1="0" :y1="(rowIndex + 1) * rowHeight" :x2="canvasWidth" :y2="(rowIndex + 1) * rowHeight" stroke="#E5E7EB" stroke-width="0.5"/>
+
+                                        <!-- Label -->
+                                        <text v-if="row.type === 'gruppe'"
+                                              x="12" :y="rowIndex * rowHeight + rowHeight/2 + 4"
+                                              font-size="12" font-weight="700" :fill="row.color || '#991B1B'">
+                                            {{ row.name }}
+                                        </text>
+                                        <text v-else
+                                              :x="24 + (row.einrueckung || 0) * 16" :y="rowIndex * rowHeight + rowHeight/2 + 4"
+                                              font-size="11" fill="#374151">
+                                            {{ row.name }}
+                                        </text>
+
+                                        <!-- Phase Bar -->
+                                        <g v-if="row.type === 'phase' && row.startX !== null">
+                                            <!-- Hauptbalken -->
+                                            <rect :x="row.startX"
+                                                  :y="rowIndex * rowHeight + 8"
+                                                  :width="Math.max(row.width, 8)"
+                                                  :height="rowHeight - 16"
+                                                  :fill="row.color"
+                                                  class="phase-bar"
+                                                  rx="2"/>
+
+                                            <!-- Kritischer Pfad Markierung (Linie am Ende) -->
+                                            <line v-if="row.kritisch"
+                                                  :x1="row.startX + row.width"
+                                                  :y1="rowIndex * rowHeight + 4"
+                                                  :x2="row.startX + row.width"
+                                                  :y2="rowIndex * rowHeight + rowHeight - 4"
+                                                  class="critical-marker"/>
+
+                                            <!-- Puffer (gestrichelte Linie) -->
+                                            <line v-if="row.pufferWidth > 0"
+                                                  :x1="row.startX + row.width"
+                                                  :y1="rowIndex * rowHeight + rowHeight/2"
+                                                  :x2="row.startX + row.width + row.pufferWidth"
+                                                  :y2="rowIndex * rowHeight + rowHeight/2"
+                                                  :stroke="row.color"
+                                                  class="buffer-line"/>
+                                        </g>
+
+                                        <!-- Meilenstein -->
+                                        <g v-if="row.type === 'meilenstein' && row.x !== null">
+                                            <polygon :points="getMilestonePoints(row.x, rowIndex * rowHeight + rowHeight/2)"
+                                                     fill="none" stroke="#991B1B" stroke-width="1.5"
+                                                     class="milestone-icon"/>
+                                        </g>
+                                    </template>
+
+                                    <!-- Heute-Linie vertikal -->
+                                    <line v-if="currentProject.einstellungen.heuteAnzeigen && todayX >= labelWidth"
+                                          :x1="todayX" y1="0" :x2="todayX" :y2="timelineRows.length * rowHeight"
+                                          class="today-line"/>
+                                </g>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+
+        <!-- Export Modal -->
+        <div v-if="showExportModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div class="bg-white rounded-lg shadow-xl p-6 w-96">
+                <h3 class="text-lg font-semibold mb-4">Timeline exportieren</h3>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm text-gray-600 mb-1">Format</label>
+                        <div class="flex space-x-4">
+                            <label class="flex items-center space-x-2">
+                                <input type="radio" v-model="exportSettings.format" value="png">
+                                <span>PNG</span>
+                            </label>
+                            <label class="flex items-center space-x-2">
+                                <input type="radio" v-model="exportSettings.format" value="svg">
+                                <span>SVG</span>
+                            </label>
+                        </div>
+                    </div>
+                    <div v-if="exportSettings.format === 'png'">
+                        <label class="block text-sm text-gray-600 mb-1">Skalierung</label>
+                        <select v-model.number="exportSettings.scale" class="w-full border border-gray-300 rounded px-3 py-2">
+                            <option :value="1">1x (Standard)</option>
+                            <option :value="2">2x (Hohe Auflösung)</option>
+                            <option :value="3">3x (Sehr hohe Auflösung)</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="flex justify-end space-x-3 mt-6">
+                    <button @click="showExportModal = false" class="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50">Abbrechen</button>
+                    <button @click="exportTimeline" class="px-4 py-2 bg-red-700 text-white rounded hover:bg-red-800">Exportieren</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- JSON Import/Export Modal -->
+        <div v-if="showImportExportModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div class="bg-white rounded-lg shadow-xl p-6 w-[550px]">
+                <h3 class="text-lg font-semibold mb-4">JSON Import/Export</h3>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm text-gray-600 mb-1">Projekt-JSON</label>
+                        <textarea v-model="jsonDataInput" rows="14" class="w-full border border-gray-300 rounded px-3 py-2 font-mono text-xs"></textarea>
+                    </div>
+                </div>
+                <div class="flex justify-between mt-6">
+                    <div class="space-x-2">
+                        <button @click="copyJsonToClipboard" class="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50">Kopieren</button>
+                        <button @click="importFromJson" class="px-4 py-2 border border-blue-500 text-blue-600 rounded hover:bg-blue-50">Importieren</button>
+                    </div>
+                    <button @click="showImportExportModal = false" class="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300">Schließen</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Vorlagen Modal -->
+        <div v-if="showTemplatesModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div class="bg-white rounded-lg shadow-xl p-6 w-[500px] max-h-[80vh] flex flex-col">
+                <h3 class="text-lg font-semibold mb-4">Vorlagen verwalten</h3>
+                <div class="flex-1 overflow-y-auto">
+                    <div v-if="templates.length === 0" class="text-gray-400 text-center py-8">
+                        Keine Vorlagen gespeichert.<br>
+                        <span class="text-sm">Speichere ein Projekt als Vorlage über "Als Vorlage speichern".</span>
+                    </div>
+                    <div v-else class="space-y-2">
+                        <div v-for="template in templates" :key="template.id"
+                             class="border border-gray-200 rounded p-3 bg-gray-50">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <div class="font-medium text-gray-800">{{ template.name }}</div>
+                                    <div class="text-xs text-gray-500">
+                                        {{ template.gruppen?.length || 0 }} Gruppen,
+                                        {{ template.elemente?.length || 0 }} Elemente
+                                    </div>
+                                    <div class="text-xs text-gray-400">Erstellt: {{ formatDateShort(template.erstelltAm) }}</div>
+                                </div>
+                                <div class="flex items-center space-x-2">
+                                    <button @click="createFromTemplate(template); showTemplatesModal = false"
+                                            class="px-3 py-1 text-sm bg-green-500 text-white rounded hover:bg-green-600">
+                                        Verwenden
+                                    </button>
+                                    <button @click="exportTemplateAsJson(template)"
+                                            class="px-2 py-1 text-sm border border-gray-300 rounded hover:bg-gray-100">
+                                        JSON
+                                    </button>
+                                    <button @click="deleteTemplate(template.id)"
+                                            class="px-2 py-1 text-sm text-red-500 hover:text-red-700 hover:bg-red-50 rounded">
+                                        Löschen
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex justify-between mt-6 pt-4 border-t border-gray-200">
+                    <button @click="importTemplateFromJson" class="px-4 py-2 border border-blue-500 text-blue-600 rounded hover:bg-blue-50">
+                        Vorlage importieren
+                    </button>
+                    <button @click="showTemplatesModal = false" class="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300">Schließen</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Vorlage speichern Modal -->
+        <div v-if="showSaveTemplateModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div class="bg-white rounded-lg shadow-xl p-6 w-96">
+                <h3 class="text-lg font-semibold mb-4">Als Vorlage speichern</h3>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm text-gray-600 mb-1">Vorlagenname</label>
+                        <input v-model="newTemplateName" type="text" class="w-full border border-gray-300 rounded px-3 py-2"
+                               placeholder="z.B. Standard Transition" @keyup.enter="confirmSaveTemplate">
+                    </div>
+                    <p class="text-xs text-gray-500">
+                        Die Vorlage enthält alle Gruppen und Elemente des aktuellen Projekts.
+                        Beim Erstellen eines neuen Projekts werden die Daten relativ zum neuen Startdatum angepasst.
+                    </p>
+                </div>
+                <div class="flex justify-end space-x-3 mt-6">
+                    <button @click="showSaveTemplateModal = false" class="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50">Abbrechen</button>
+                    <button @click="confirmSaveTemplate" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">Speichern</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    const { createApp, ref, computed, watch, onMounted, nextTick } = Vue;
+
+    createApp({
+        setup() {
+            // State
+            const projects = ref([]);
+            const templates = ref([]);
+            const currentProjectId = ref(null);
+            const activeTab = ref('projekt');
+
+            // Drag & Drop State
+            const draggedElement = ref(null);
+            const dragOverId = ref(null);
+            const showExportModal = ref(false);
+            const showImportExportModal = ref(false);
+            const showTemplatesModal = ref(false);
+            const showSaveTemplateModal = ref(false);
+            const newTemplateName = ref('');
+            const jsonDataInput = ref('');
+            const timelineContainer = ref(null);
+            const timelineSvg = ref(null);
+
+            const rowHeight = 28;
+            const labelWidth = 280;
+
+            const exportSettings = ref({
+                format: 'png',
+                scale: 2
+            });
+
+            // Farben
+            const colors = {
+                gruen: '#166534',
+                rot: '#991B1B',
+                dunkelrot: '#450a0a'
+            };
+
+            // Computed
+            const currentProject = computed(() => {
+                return projects.value.find(p => p.id === currentProjectId.value) || null;
+            });
+
+            const sortedGruppen = computed(() => {
+                if (!currentProject.value) return [];
+                return [...currentProject.value.gruppen].sort((a, b) => a.reihenfolge - b.reihenfolge);
+            });
+
+            const sortedElemente = computed(() => {
+                if (!currentProject.value) return [];
+                return [...currentProject.value.elemente].sort((a, b) => a.reihenfolge - b.reihenfolge);
+            });
+
+            // Legende: Verwendete Farben ermitteln
+            const usedColors = computed(() => {
+                if (!currentProject.value) return [];
+                const used = new Set();
+                currentProject.value.elemente.forEach(e => {
+                    if (e.typ === 'phase' && e.farbe) {
+                        used.add(e.farbe);
+                    }
+                });
+                const farbNamen = currentProject.value.einstellungen?.farbNamen || {};
+                const defaultNames = { gruen: 'Vorbereitung', rot: 'Plandauer', dunkelrot: 'Kritisch' };
+                return Array.from(used).map(key => ({
+                    key,
+                    hex: colors[key] || '#991B1B',
+                    name: farbNamen[key] || defaultNames[key] || key
+                }));
+            });
+
+            const hasBuffer = computed(() => {
+                if (!currentProject.value) return false;
+                return currentProject.value.elemente.some(e => e.typ === 'phase' && e.pufferTage > 0);
+            });
+
+            const hasMilestones = computed(() => {
+                if (!currentProject.value) return false;
+                return currentProject.value.elemente.some(e => e.typ === 'meilenstein');
+            });
+
+            const hasCritical = computed(() => {
+                if (!currentProject.value) return false;
+                return currentProject.value.elemente.some(e => e.typ === 'phase' && e.kritisch);
+            });
+
+            const projectDuration = computed(() => {
+                if (!currentProject.value) return { start: null, end: null, days: 0 };
+                const start = new Date(currentProject.value.projekt.start);
+                const end = new Date(currentProject.value.projekt.ende);
+                const days = Math.ceil((end - start) / (1000 * 60 * 60 * 24));
+                return { start, end, days };
+            });
+
+            const pixelsPerDay = computed(() => {
+                if (!currentProject.value) return 3;
+                return currentProject.value.einstellungen.zeitskala === 'quartal' ? 1.5 : 3;
+            });
+
+            const canvasWidth = computed(() => {
+                const minWidth = 900;
+                const daysToShow = projectDuration.value.days || 365;
+                return Math.max(minWidth, labelWidth + daysToShow * pixelsPerDay.value + 50);
+            });
+
+            const timelineRows = computed(() => {
+                if (!currentProject.value) return [];
+                const rows = [];
+
+                // Für jede Gruppe und ihre Elemente
+                for (const gruppe of sortedGruppen.value) {
+                    // Gruppe als Header-Zeile
+                    rows.push({
+                        type: 'gruppe',
+                        name: gruppe.name,
+                        color: '#991B1B'
+                    });
+
+                    // Maximale X-Position (Canvas-Ende)
+                    const maxX = canvasWidth.value - 10;
+
+                    // Elemente dieser Gruppe
+                    const gruppenElemente = sortedElemente.value.filter(e => e.gruppe === gruppe.id);
+                    for (const element of gruppenElemente) {
+                        if (element.typ === 'phase') {
+                            const startX = getDateX(element.start);
+                            const endX = getDateX(element.ende);
+                            const rawWidth = Math.max(endX - startX, 8);
+                            // Clip width to not exceed canvas
+                            const clippedWidth = Math.min(rawWidth, maxX - startX);
+                            const puffer = (element.pufferTage || 0) * pixelsPerDay.value;
+                            // Clip buffer to not exceed canvas
+                            const clippedPuffer = Math.max(0, Math.min(puffer, maxX - startX - clippedWidth));
+                            rows.push({
+                                type: 'phase',
+                                name: element.name,
+                                einrueckung: element.einrueckung || 0,
+                                startX: startX,
+                                width: clippedWidth,
+                                pufferWidth: clippedPuffer,
+                                color: colors[element.farbe] || colors.rot,
+                                kritisch: element.kritisch
+                            });
+                        } else {
+                            rows.push({
+                                type: 'meilenstein',
+                                name: element.name,
+                                einrueckung: element.einrueckung || 0,
+                                x: getDateX(element.datum)
+                            });
+                        }
+                    }
+                }
+
+                // Elemente ohne Gruppe
+                const ohneGruppe = sortedElemente.value.filter(e => !e.gruppe);
+                if (ohneGruppe.length > 0) {
+                    const maxX = canvasWidth.value - 10;
+                    for (const element of ohneGruppe) {
+                        if (element.typ === 'phase') {
+                            const startX = getDateX(element.start);
+                            const endX = getDateX(element.ende);
+                            const rawWidth = Math.max(endX - startX, 8);
+                            const clippedWidth = Math.min(rawWidth, maxX - startX);
+                            const puffer = (element.pufferTage || 0) * pixelsPerDay.value;
+                            const clippedPuffer = Math.max(0, Math.min(puffer, maxX - startX - clippedWidth));
+                            rows.push({
+                                type: 'phase',
+                                name: element.name,
+                                einrueckung: element.einrueckung || 0,
+                                startX: startX,
+                                width: clippedWidth,
+                                pufferWidth: clippedPuffer,
+                                color: colors[element.farbe] || colors.rot,
+                                kritisch: element.kritisch
+                            });
+                        } else {
+                            rows.push({
+                                type: 'meilenstein',
+                                name: element.name,
+                                einrueckung: element.einrueckung || 0,
+                                x: getDateX(element.datum)
+                            });
+                        }
+                    }
+                }
+
+                return rows;
+            });
+
+            const canvasHeight = computed(() => {
+                const legendeHeight = currentProject.value?.einstellungen.legendeAnzeigen ? 0 : 0;
+                return 48 + timelineRows.value.length * rowHeight + 20;
+            });
+
+            const yearPeriods = computed(() => {
+                if (!currentProject.value || !projectDuration.value.start) return [];
+                const periods = [];
+                const { start, end } = projectDuration.value;
+
+                let currentYear = start.getFullYear();
+                const endYear = end.getFullYear();
+
+                while (currentYear <= endYear) {
+                    const yearStart = new Date(currentYear, 0, 1);
+                    const yearEnd = new Date(currentYear, 11, 31);
+
+                    const displayStart = yearStart < start ? start : yearStart;
+                    const displayEnd = yearEnd > end ? end : yearEnd;
+
+                    const x = getDateX(displayStart);
+                    const endX = getDateX(displayEnd);
+                    const width = endX - x;
+
+                    // Only show label if there's enough width (> 60px)
+                    const showLabel = width > 60;
+                    // Center the label, but ensure it's at least at labelWidth + 30
+                    const labelX = Math.max(labelWidth + 30, x + width / 2);
+
+                    periods.push({
+                        label: currentYear.toString(),
+                        x: x,
+                        width: width,
+                        labelX: labelX,
+                        showLabel: showLabel
+                    });
+
+                    currentYear++;
+                }
+                return periods;
+            });
+
+            const timePeriods = computed(() => {
+                if (!currentProject.value || !projectDuration.value.start) return [];
+                const periods = [];
+                const { start, end } = projectDuration.value;
+                const scale = currentProject.value.einstellungen.zeitskala;
+
+                const monthNames = ['JAN', 'FEB', 'MÄR', 'APR', 'MAI', 'JUN', 'JUL', 'AUG', 'SEP', 'OKT', 'NOV', 'DEZ'];
+
+                let current = new Date(start.getFullYear(), start.getMonth(), 1);
+
+                while (current <= end) {
+                    let label, nextDate;
+
+                    if (scale === 'quartal') {
+                        const quarter = Math.floor(current.getMonth() / 3) + 1;
+                        label = `Q${quarter}`;
+                        nextDate = new Date(current);
+                        nextDate.setMonth(nextDate.getMonth() + 3);
+                    } else {
+                        label = monthNames[current.getMonth()];
+                        nextDate = new Date(current);
+                        nextDate.setMonth(nextDate.getMonth() + 1);
+                    }
+
+                    const x = getDateX(current);
+                    const width = getDateX(nextDate) - x;
+
+                    if (x >= labelWidth - 10) {
+                        periods.push({ label, x, width });
+                    }
+                    current = nextDate;
+                }
+                return periods;
+            });
+
+            const todayX = computed(() => {
+                if (!currentProject.value) return -1;
+                return getDateX(new Date());
+            });
+
+            // Watch for modal open to update JSON
+            watch(showImportExportModal, (newVal) => {
+                if (newVal && currentProject.value) {
+                    jsonDataInput.value = JSON.stringify(currentProject.value, null, 2);
+                }
+            });
+
+            // Methods
+            function generateId() {
+                return 'id_' + Math.random().toString(36).substr(2, 9);
+            }
+
+            function formatDateShort(dateStr) {
+                if (!dateStr) return '';
+                const date = new Date(dateStr);
+                return date.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' });
+            }
+
+            function getDateX(date) {
+                if (!projectDuration.value.start) return labelWidth;
+                const d = typeof date === 'string' ? new Date(date) : date;
+                const daysDiff = (d - projectDuration.value.start) / (1000 * 60 * 60 * 24);
+                return labelWidth + daysDiff * pixelsPerDay.value;
+            }
+
+            function getMilestonePoints(cx, cy) {
+                const size = 8;
+                return `${cx},${cy-size} ${cx+size},${cy} ${cx},${cy+size} ${cx-size},${cy}`;
+            }
+
+            function getElementeForGruppe(gruppeId) {
+                if (!currentProject.value) return [];
+                return sortedElemente.value.filter(e => e.gruppe === gruppeId);
+            }
+
+            function createProject() {
+                const today = new Date();
+                const startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+                const endDate = new Date(today.getFullYear() + 1, today.getMonth(), 0);
+
+                const newProject = {
+                    id: generateId(),
+                    projekt: {
+                        name: 'Neues Projekt',
+                        beschreibung: '',
+                        start: startDate.toISOString().split('T')[0],
+                        ende: endDate.toISOString().split('T')[0]
+                    },
+                    gruppen: [
+                        { id: generateId(), name: 'Phasenplan', reihenfolge: 1 }
+                    ],
+                    elemente: [],
+                    einstellungen: {
+                        heuteAnzeigen: true,
+                        legendeAnzeigen: true,
+                        zeitskala: 'monat',
+                        farbNamen: {
+                            gruen: 'Vorbereitung',
+                            rot: 'Plandauer',
+                            dunkelrot: 'Kritisch'
+                        }
+                    }
+                };
+
+                projects.value.push(newProject);
+                currentProjectId.value = newProject.id;
+                saveToStorage();
+            }
+
+            function selectProject(id) {
+                currentProjectId.value = id;
+            }
+
+            function duplicateProject() {
+                if (!currentProject.value) return;
+                const copy = JSON.parse(JSON.stringify(currentProject.value));
+                copy.id = generateId();
+                copy.projekt.name = copy.projekt.name + ' (Kopie)';
+
+                // Generate new IDs
+                const idMap = {};
+                copy.gruppen.forEach(g => {
+                    const oldId = g.id;
+                    g.id = generateId();
+                    idMap[oldId] = g.id;
+                });
+                copy.elemente.forEach(e => {
+                    e.id = generateId();
+                    if (e.gruppe && idMap[e.gruppe]) e.gruppe = idMap[e.gruppe];
+                });
+
+                projects.value.push(copy);
+                currentProjectId.value = copy.id;
+                saveToStorage();
+            }
+
+            function deleteProject() {
+                if (!currentProject.value) return;
+                if (!confirm(`Projekt "${currentProject.value.projekt.name}" wirklich löschen?`)) return;
+                const index = projects.value.findIndex(p => p.id === currentProjectId.value);
+                if (index >= 0) {
+                    projects.value.splice(index, 1);
+                    currentProjectId.value = projects.value[0]?.id || null;
+                    saveToStorage();
+                }
+            }
+
+            // Template Functions
+            function saveAsTemplate() {
+                if (!currentProject.value) return;
+                newTemplateName.value = currentProject.value.projekt.name + ' (Vorlage)';
+                showSaveTemplateModal.value = true;
+            }
+
+            function confirmSaveTemplate() {
+                if (!currentProject.value || !newTemplateName.value.trim()) return;
+
+                const template = {
+                    id: generateId(),
+                    name: newTemplateName.value.trim(),
+                    erstelltAm: new Date().toISOString().split('T')[0],
+                    // Store relative days from project start for each element
+                    projektDauer: getDaysBetween(currentProject.value.projekt.start, currentProject.value.projekt.ende),
+                    gruppen: JSON.parse(JSON.stringify(currentProject.value.gruppen)),
+                    elemente: currentProject.value.elemente.map(e => {
+                        const copy = JSON.parse(JSON.stringify(e));
+                        // Convert absolute dates to relative days from project start
+                        if (e.typ === 'phase') {
+                            copy.startTag = getDaysBetween(currentProject.value.projekt.start, e.start);
+                            copy.endeTag = getDaysBetween(currentProject.value.projekt.start, e.ende);
+                            delete copy.start;
+                            delete copy.ende;
+                        } else {
+                            copy.datumTag = getDaysBetween(currentProject.value.projekt.start, e.datum);
+                            delete copy.datum;
+                        }
+                        return copy;
+                    }),
+                    einstellungen: JSON.parse(JSON.stringify(currentProject.value.einstellungen))
+                };
+
+                templates.value.push(template);
+                saveTemplatesToStorage();
+                showSaveTemplateModal.value = false;
+                newTemplateName.value = '';
+                alert('Vorlage "' + template.name + '" gespeichert!');
+            }
+
+            function createFromTemplate(template) {
+                const today = new Date();
+                const startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+                const endDate = new Date(startDate);
+                endDate.setDate(endDate.getDate() + (template.projektDauer || 180));
+
+                // Generate new IDs for groups
+                const gruppenIdMap = {};
+                const newGruppen = template.gruppen.map(g => {
+                    const newId = generateId();
+                    gruppenIdMap[g.id] = newId;
+                    return { ...g, id: newId };
+                });
+
+                // Generate new IDs for elements and convert relative days back to dates
+                const newElemente = template.elemente.map(e => {
+                    const copy = { ...e, id: generateId() };
+                    if (copy.gruppe && gruppenIdMap[copy.gruppe]) {
+                        copy.gruppe = gruppenIdMap[copy.gruppe];
+                    }
+                    if (e.typ === 'phase') {
+                        copy.start = addDaysToDate(startDate, e.startTag || 0);
+                        copy.ende = addDaysToDate(startDate, e.endeTag || 30);
+                        delete copy.startTag;
+                        delete copy.endeTag;
+                    } else {
+                        copy.datum = addDaysToDate(startDate, e.datumTag || 0);
+                        delete copy.datumTag;
+                    }
+                    return copy;
+                });
+
+                const newProject = {
+                    id: generateId(),
+                    projekt: {
+                        name: 'Neues Projekt (aus ' + template.name + ')',
+                        beschreibung: '',
+                        start: startDate.toISOString().split('T')[0],
+                        ende: endDate.toISOString().split('T')[0]
+                    },
+                    gruppen: newGruppen,
+                    elemente: newElemente,
+                    einstellungen: template.einstellungen ? JSON.parse(JSON.stringify(template.einstellungen)) : {
+                        heuteAnzeigen: true,
+                        legendeAnzeigen: true,
+                        zeitskala: 'monat'
+                    }
+                };
+
+                projects.value.push(newProject);
+                currentProjectId.value = newProject.id;
+                saveToStorage();
+            }
+
+            function deleteTemplate(id) {
+                const template = templates.value.find(t => t.id === id);
+                if (!confirm(`Vorlage "${template?.name}" wirklich löschen?`)) return;
+                const index = templates.value.findIndex(t => t.id === id);
+                if (index >= 0) {
+                    templates.value.splice(index, 1);
+                    saveTemplatesToStorage();
+                }
+            }
+
+            function exportTemplateAsJson(template) {
+                const json = JSON.stringify(template, null, 2);
+                navigator.clipboard.writeText(json)
+                    .then(() => alert('Vorlage-JSON in Zwischenablage kopiert'))
+                    .catch(e => alert('Kopieren fehlgeschlagen: ' + e.message));
+            }
+
+            function importTemplateFromJson() {
+                const jsonStr = prompt('Vorlage-JSON einfügen:');
+                if (!jsonStr) return;
+                try {
+                    const imported = JSON.parse(jsonStr);
+                    if (!imported.name || !imported.gruppen) {
+                        throw new Error('Ungültiges Vorlagenformat');
+                    }
+                    imported.id = generateId();
+                    imported.erstelltAm = new Date().toISOString().split('T')[0];
+                    templates.value.push(imported);
+                    saveTemplatesToStorage();
+                    alert('Vorlage "' + imported.name + '" importiert!');
+                } catch (e) {
+                    alert('Import fehlgeschlagen: ' + e.message);
+                }
+            }
+
+            function getDaysBetween(startStr, endStr) {
+                const start = new Date(startStr);
+                const end = new Date(endStr);
+                return Math.round((end - start) / (1000 * 60 * 60 * 24));
+            }
+
+            function addDaysToDate(date, days) {
+                const result = new Date(date);
+                result.setDate(result.getDate() + days);
+                return result.toISOString().split('T')[0];
+            }
+
+            function saveTemplatesToStorage() {
+                localStorage.setItem('timelineGenerator_templates', JSON.stringify(templates.value));
+            }
+
+            function loadTemplatesFromStorage() {
+                try {
+                    const saved = localStorage.getItem('timelineGenerator_templates');
+                    if (saved) {
+                        templates.value = JSON.parse(saved);
+                    }
+                } catch (e) {
+                    console.error('Error loading templates:', e);
+                }
+            }
+
+            function addGruppe() {
+                if (!currentProject.value) return;
+                const nextOrder = Math.max(0, ...currentProject.value.gruppen.map(g => g.reihenfolge)) + 1;
+                currentProject.value.gruppen.push({
+                    id: generateId(),
+                    name: 'Neue Gruppe',
+                    reihenfolge: nextOrder
+                });
+                saveToStorage();
+            }
+
+            function moveGruppe(gruppe, direction) {
+                const gruppen = currentProject.value.gruppen;
+                const sorted = [...gruppen].sort((a, b) => a.reihenfolge - b.reihenfolge);
+                const currentIndex = sorted.findIndex(g => g.id === gruppe.id);
+                const newIndex = currentIndex + direction;
+
+                if (newIndex >= 0 && newIndex < sorted.length) {
+                    const other = sorted[newIndex];
+                    const tempOrder = gruppe.reihenfolge;
+                    gruppe.reihenfolge = other.reihenfolge;
+                    other.reihenfolge = tempOrder;
+                    saveToStorage();
+                }
+            }
+
+            function deleteGruppe(id) {
+                if (!currentProject.value) return;
+                const gruppe = currentProject.value.gruppen.find(g => g.id === id);
+                if (!confirm(`Gruppe "${gruppe?.name}" wirklich löschen? Elemente werden nicht gelöscht.`)) return;
+                const index = currentProject.value.gruppen.findIndex(g => g.id === id);
+                if (index >= 0) {
+                    currentProject.value.gruppen.splice(index, 1);
+                    // Clear gruppe references
+                    currentProject.value.elemente.forEach(e => { if (e.gruppe === id) e.gruppe = ''; });
+                    saveToStorage();
+                }
+            }
+
+            function addElement(typ) {
+                if (!currentProject.value) return;
+                const today = new Date();
+                const nextOrder = Math.max(0, ...currentProject.value.elemente.map(e => e.reihenfolge)) + 1;
+                const defaultGruppe = sortedGruppen.value[0]?.id || '';
+
+                if (typ === 'phase') {
+                    const endDate = new Date(today);
+                    endDate.setMonth(endDate.getMonth() + 1);
+                    currentProject.value.elemente.push({
+                        id: generateId(),
+                        typ: 'phase',
+                        name: 'Neue Phase',
+                        gruppe: defaultGruppe,
+                        einrueckung: 0,
+                        start: today.toISOString().split('T')[0],
+                        ende: endDate.toISOString().split('T')[0],
+                        kritisch: false,
+                        pufferTage: 0,
+                        farbe: 'rot',
+                        reihenfolge: nextOrder
+                    });
+                } else {
+                    currentProject.value.elemente.push({
+                        id: generateId(),
+                        typ: 'meilenstein',
+                        name: 'Neuer Meilenstein',
+                        gruppe: defaultGruppe,
+                        einrueckung: 0,
+                        datum: today.toISOString().split('T')[0],
+                        reihenfolge: nextOrder
+                    });
+                }
+                saveToStorage();
+            }
+
+            function moveElement(element, direction) {
+                const elemente = currentProject.value.elemente;
+                const sameGruppe = elemente.filter(e => e.gruppe === element.gruppe).sort((a, b) => a.reihenfolge - b.reihenfolge);
+                const currentIndex = sameGruppe.findIndex(e => e.id === element.id);
+                const newIndex = currentIndex + direction;
+
+                if (newIndex >= 0 && newIndex < sameGruppe.length) {
+                    const other = sameGruppe[newIndex];
+                    const tempOrder = element.reihenfolge;
+                    element.reihenfolge = other.reihenfolge;
+                    other.reihenfolge = tempOrder;
+                    saveToStorage();
+                }
+            }
+
+            function deleteElement(id) {
+                if (!currentProject.value) return;
+                const index = currentProject.value.elemente.findIndex(e => e.id === id);
+                if (index >= 0) {
+                    currentProject.value.elemente.splice(index, 1);
+                    saveToStorage();
+                }
+            }
+
+            // Drag & Drop Funktionen
+            function onDragStart(event, element) {
+                draggedElement.value = element;
+                event.target.classList.add('dragging');
+                event.dataTransfer.effectAllowed = 'move';
+                event.dataTransfer.setData('text/plain', element.id);
+            }
+
+            function onDragOver(event, targetElement) {
+                event.preventDefault();
+                event.dataTransfer.dropEffect = 'move';
+                if (draggedElement.value && draggedElement.value.id !== targetElement.id) {
+                    dragOverId.value = targetElement.id;
+                }
+            }
+
+            function onDragLeave(event) {
+                // Nur zurücksetzen wenn wir wirklich das Element verlassen
+                if (!event.currentTarget.contains(event.relatedTarget)) {
+                    dragOverId.value = null;
+                }
+            }
+
+            function onDrop(event, targetElement) {
+                event.preventDefault();
+                dragOverId.value = null;
+
+                if (!draggedElement.value || !currentProject.value) return;
+                if (draggedElement.value.id === targetElement.id) return;
+
+                const elemente = currentProject.value.elemente;
+                const draggedIdx = elemente.findIndex(e => e.id === draggedElement.value.id);
+                const targetIdx = elemente.findIndex(e => e.id === targetElement.id);
+
+                if (draggedIdx === -1 || targetIdx === -1) return;
+
+                // Element an neue Position verschieben
+                const [removed] = elemente.splice(draggedIdx, 1);
+                elemente.splice(targetIdx, 0, removed);
+
+                // Reihenfolge neu berechnen
+                elemente.forEach((el, idx) => {
+                    el.reihenfolge = idx + 1;
+                });
+
+                // Wenn in andere Gruppe gezogen, Gruppe übernehmen
+                if (draggedElement.value.gruppe !== targetElement.gruppe) {
+                    draggedElement.value.gruppe = targetElement.gruppe;
+                }
+
+                saveToStorage();
+                draggedElement.value = null;
+            }
+
+            function onDragEnd(event) {
+                event.target.classList.remove('dragging');
+                draggedElement.value = null;
+                dragOverId.value = null;
+            }
+
+            function saveToStorage() {
+                localStorage.setItem('timelineGenerator_projects_v2', JSON.stringify(projects.value));
+                localStorage.setItem('timelineGenerator_currentId_v2', currentProjectId.value);
+            }
+
+            function loadFromStorage() {
+                try {
+                    const savedProjects = localStorage.getItem('timelineGenerator_projects_v2');
+                    const savedCurrentId = localStorage.getItem('timelineGenerator_currentId_v2');
+                    if (savedProjects) {
+                        projects.value = JSON.parse(savedProjects);
+                    }
+                    if (savedCurrentId && projects.value.find(p => p.id === savedCurrentId)) {
+                        currentProjectId.value = savedCurrentId;
+                    }
+                } catch (e) {
+                    console.error('Error loading from storage:', e);
+                }
+            }
+
+            async function exportTimeline() {
+                const format = exportSettings.value.format;
+
+                if (format === 'svg') {
+                    exportAsSvg();
+                } else {
+                    await exportAsPng();
+                }
+                showExportModal.value = false;
+            }
+
+            function exportAsSvg() {
+                const container = timelineContainer.value;
+                if (!container) return;
+
+                // Clone the container
+                const clone = container.cloneNode(true);
+                const svg = clone.querySelector('svg');
+
+                // Add necessary styles inline
+                const styleElement = document.createElementNS('http://www.w3.org/2000/svg', 'style');
+                styleElement.textContent = `
+                    .buffer-line { stroke-dasharray: 8, 4; stroke-width: 3; fill: none; }
+                    .critical-marker { stroke: #991B1B; stroke-width: 2; }
+                    .today-line { stroke: #1F2937; stroke-width: 2; }
+                    .grid-line { stroke: #D1D5DB; stroke-width: 1; }
+                    .grid-line-light { stroke: #E5E7EB; stroke-width: 0.5; }
+                `;
+                svg.insertBefore(styleElement, svg.firstChild);
+
+                const serializer = new XMLSerializer();
+                let source = serializer.serializeToString(svg);
+                source = '<?xml version="1.0" standalone="no"?>\r\n' + source;
+
+                const blob = new Blob([source], { type: 'image/svg+xml;charset=utf-8' });
+                const url = URL.createObjectURL(blob);
+
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `${currentProject.value.projekt.name}_timeline.svg`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+            }
+
+            async function exportAsPng() {
+                const container = timelineContainer.value;
+                if (!container) return;
+
+                try {
+                    const canvas = await html2canvas(container, {
+                        backgroundColor: '#FFFFFF',
+                        scale: exportSettings.value.scale
+                    });
+
+                    const link = document.createElement('a');
+                    link.href = canvas.toDataURL('image/png');
+                    link.download = `${currentProject.value.projekt.name}_timeline.png`;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                } catch (e) {
+                    console.error('Export error:', e);
+                    alert('Export fehlgeschlagen: ' + e.message);
+                }
+            }
+
+            function copyJsonToClipboard() {
+                if (!currentProject.value) return;
+                const json = JSON.stringify(currentProject.value, null, 2);
+                navigator.clipboard.writeText(json)
+                    .then(() => alert('JSON in Zwischenablage kopiert'))
+                    .catch(e => alert('Kopieren fehlgeschlagen: ' + e.message));
+            }
+
+            function importFromJson() {
+                if (!jsonDataInput.value) return;
+
+                try {
+                    const imported = JSON.parse(jsonDataInput.value);
+                    if (!imported.projekt || !imported.gruppen) {
+                        throw new Error('Ungültiges Projektformat');
+                    }
+                    imported.id = generateId();
+                    projects.value.push(imported);
+                    currentProjectId.value = imported.id;
+                    saveToStorage();
+                    showImportExportModal.value = false;
+                    alert('Projekt erfolgreich importiert');
+                } catch (e) {
+                    alert('Import fehlgeschlagen: ' + e.message);
+                }
+            }
+
+            // Lifecycle
+            onMounted(() => {
+                loadFromStorage();
+                loadTemplatesFromStorage();
+                if (projects.value.length === 0) {
+                    createProject();
+                }
+            });
+
+            return {
+                projects,
+                templates,
+                currentProject,
+                currentProjectId,
+                activeTab,
+                sortedGruppen,
+                sortedElemente,
+                usedColors,
+                hasBuffer,
+                hasMilestones,
+                hasCritical,
+                dragOverId,
+                rowHeight,
+                labelWidth,
+                canvasWidth,
+                canvasHeight,
+                yearPeriods,
+                timePeriods,
+                timelineRows,
+                todayX,
+                showExportModal,
+                showImportExportModal,
+                showTemplatesModal,
+                showSaveTemplateModal,
+                newTemplateName,
+                exportSettings,
+                jsonDataInput,
+                timelineContainer,
+                timelineSvg,
+                formatDateShort,
+                getElementeForGruppe,
+                getMilestonePoints,
+                createProject,
+                selectProject,
+                duplicateProject,
+                deleteProject,
+                saveAsTemplate,
+                confirmSaveTemplate,
+                createFromTemplate,
+                deleteTemplate,
+                exportTemplateAsJson,
+                importTemplateFromJson,
+                addGruppe,
+                moveGruppe,
+                deleteGruppe,
+                addElement,
+                moveElement,
+                deleteElement,
+                onDragStart,
+                onDragOver,
+                onDragLeave,
+                onDrop,
+                onDragEnd,
+                exportTimeline,
+                copyJsonToClipboard,
+                importFromJson,
+                saveToStorage
+            };
+        }
+    }).mount('#app');
+    </script>
+</body>
+</html>
