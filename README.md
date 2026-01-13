@@ -8,7 +8,7 @@
 
 A powerful, browser-based timeline generator for project management and transition planning. Create professional Gantt-style timelines without any server or installation required.
 
-![Timeline Generator Preview](docs/screenshot-main.png)
+![Timeline Generator Preview](docs/screenshot-dark-mode.png)
 
 ---
 
