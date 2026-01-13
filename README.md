@@ -32,7 +32,7 @@ A powerful, browser-based timeline generator for project management and transiti
 - **Vertical Roadmap** — Modern centered timeline with alternating elements
 - **CSV Import** — Import timeline data from Excel/CSV files
 - **Batch Input** — Add multiple elements at once
-- **German UI** — Interface in German (contributions for i18n welcome!)
+- **Bilingual (DE/EN)** — Language switcher in header, defaults to German
 
 ---
 

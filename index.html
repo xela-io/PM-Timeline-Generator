@@ -97,15 +97,19 @@
         <div class="flex h-screen">
             <!-- Sidebar -->
             <aside class="w-64 bg-white border-r border-gray-200 flex flex-col no-print">
-                <div class="p-4 border-b border-gray-200">
+                <div class="p-4 border-b border-gray-200 flex items-center justify-between">
                     <h1 class="text-xl font-semibold text-gray-800">Timeline Generator</h1>
+                    <button @click="locale = locale === 'de' ? 'en' : 'de'"
+                            class="text-sm px-2 py-1 rounded bg-gray-100 hover:bg-gray-200 font-medium">
+                        {{ locale === 'de' ? 'EN' : 'DE' }}
+                    </button>
                 </div>
 
                 <!-- Projektliste -->
                 <div class="flex-1 overflow-y-auto p-4">
                     <div class="flex items-center justify-between mb-3">
-                        <h2 class="text-sm font-medium text-gray-600">Projekte</h2>
-                        <button @click="createProject" class="text-blue-600 hover:text-blue-800 text-sm font-medium">+ Neu</button>
+                        <h2 class="text-sm font-medium text-gray-600">{{ t('sidebar.projects') }}</h2>
+                        <button @click="createProject" class="text-blue-600 hover:text-blue-800 text-sm font-medium">{{ t('sidebar.new') }}</button>
                     </div>
                     <div class="space-y-1">
                         <div v-for="project in projects" :key="project.id"
@@ -116,7 +120,7 @@
                             <div class="text-xs text-gray-500">{{ formatDateShort(project.projekt.start) }} - {{ formatDateShort(project.projekt.ende) }}</div>
                         </div>
                         <div v-if="projects.length === 0" class="text-gray-400 text-sm p-2">
-                            Keine Projekte vorhanden
+                            {{ t('sidebar.noProjects') }}
                         </div>
                     </div>
                 </div>
@@ -124,21 +128,21 @@
                 <!-- Projekt-Aktionen -->
                 <div v-if="currentProject" class="p-4 border-t border-gray-200 space-y-1">
                     <button @click="duplicateProject" class="w-full text-left text-sm text-gray-600 hover:text-gray-800 p-2 hover:bg-gray-50 rounded">
-                        Duplizieren
+                        {{ t('sidebar.duplicate') }}
                     </button>
                     <button @click="saveAsTemplate" class="w-full text-left text-sm text-gray-600 hover:text-gray-800 p-2 hover:bg-gray-50 rounded">
-                        Als Vorlage speichern
+                        {{ t('sidebar.saveAsTemplate') }}
                     </button>
                     <button @click="deleteProject" class="w-full text-left text-sm text-red-500 hover:text-red-700 p-2 hover:bg-red-50 rounded">
-                        Löschen
+                        {{ t('sidebar.delete') }}
                     </button>
                 </div>
 
                 <!-- Vorlagen -->
                 <div class="p-4 border-t border-gray-200">
                     <div class="flex items-center justify-between mb-2">
-                        <h2 class="text-sm font-medium text-gray-600">Vorlagen</h2>
-                        <button @click="showTemplatesModal = true" class="text-gray-400 hover:text-gray-600 text-xs">Verwalten</button>
+                        <h2 class="text-sm font-medium text-gray-600">{{ t('sidebar.templates') }}</h2>
+                        <button @click="showTemplatesModal = true" class="text-gray-400 hover:text-gray-600 text-xs">{{ t('sidebar.manage') }}</button>
                     </div>
                     <div class="space-y-1">
                         <div v-for="template in templates" :key="template.id"
@@ -150,7 +154,7 @@
                             </div>
                         </div>
                         <div v-if="templates.length === 0" class="text-gray-400 text-xs p-2">
-                            Keine Vorlagen gespeichert
+                            {{ t('sidebar.noTemplates') }}
                         </div>
                     </div>
                 </div>
@@ -162,53 +166,53 @@
                 <header class="bg-white border-b border-gray-200 p-4 flex items-center justify-between no-print">
                     <div class="flex items-center space-x-4">
                         <select v-model="activeTab" class="border border-gray-300 rounded px-3 py-1.5 text-sm bg-white">
-                            <option value="projekt">Projekt</option>
-                            <option value="gruppen">Gruppen</option>
-                            <option value="elemente">Phasen & Meilensteine</option>
+                            <option value="projekt">{{ t('toolbar.project') }}</option>
+                            <option value="gruppen">{{ t('toolbar.groups') }}</option>
+                            <option value="elemente">{{ t('toolbar.elements') }}</option>
                         </select>
                         <div class="flex items-center space-x-2" v-if="currentProject">
-                            <label class="text-sm text-gray-600">Zeitskala:</label>
+                            <label class="text-sm text-gray-600">{{ t('toolbar.timeScale') }}:</label>
                             <select v-model="currentProject.einstellungen.zeitskala" @change="saveToStorage" class="border border-gray-300 rounded px-2 py-1 text-sm bg-white">
-                                <option value="monat">Monate</option>
-                                <option value="quartal">Quartale</option>
+                                <option value="monat">{{ t('toolbar.months') }}</option>
+                                <option value="quartal">{{ t('toolbar.quarters') }}</option>
                             </select>
                         </div>
                         <div class="flex items-center space-x-2 border-l pl-2 ml-2" v-if="currentProject">
                             <button @click="darkMode = !darkMode"
                                     :class="darkMode ? 'bg-gray-700 text-yellow-300' : 'bg-gray-100 text-gray-600'"
                                     class="px-2 py-1 rounded text-sm hover:opacity-80 flex items-center space-x-1"
-                                    :title="darkMode ? 'Helles Theme' : 'Dunkles Theme'">
+                                    :title="darkMode ? t('toolbar.lightTheme') : t('toolbar.darkTheme')">
                                 <span v-if="darkMode">&#9788;</span>
                                 <span v-else>&#9790;</span>
                             </button>
                             <button @click="showExecutiveSummary = !showExecutiveSummary"
                                     :class="showExecutiveSummary ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600'"
                                     class="px-2 py-1 rounded text-sm hover:opacity-80"
-                                    title="Executive Summary - Nur Hauptelemente">
+                                    :title="t('toolbar.execSummary')">
                                 Exec
                             </button>
                             <button @click="verticalMode = !verticalMode"
                                     :class="verticalMode ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-600'"
                                     class="px-2 py-1 rounded text-sm hover:opacity-80"
-                                    title="Vertikale Roadmap">
+                                    :title="t('toolbar.verticalRoadmap')">
                                 {{ verticalMode ? '↔' : '↕' }}
                             </button>
                         </div>
                     </div>
                     <div class="flex items-center space-x-2">
                         <button @click="showExportModal = true" class="bg-red-700 text-white px-4 py-1.5 rounded text-sm hover:bg-red-800 font-medium">
-                            Export
+                            {{ t('toolbar.export') }}
                         </button>
                         <button @click="showImportExportModal = true" class="border border-gray-300 px-3 py-1.5 rounded text-sm hover:bg-gray-50">
-                            JSON
+                            {{ t('toolbar.json') }}
                         </button>
                     </div>
                 </header>
 
                 <div v-if="!currentProject" class="flex-1 flex items-center justify-center text-gray-400">
                     <div class="text-center">
-                        <p class="text-lg mb-4">Kein Projekt ausgewählt</p>
-                        <button @click="createProject" class="text-blue-600 hover:text-blue-800 font-medium">+ Neues Projekt erstellen</button>
+                        <p class="text-lg mb-4">{{ t('project.noSelected') }}</p>
+                        <button @click="createProject" class="text-blue-600 hover:text-blue-800 font-medium">{{ t('project.createNew') }}</button>
                     </div>
                 </div>
 
@@ -218,86 +222,86 @@
                          :style="{ width: editorPanelWidth + 'px' }">
                         <!-- Projekt Tab -->
                         <div v-if="activeTab === 'projekt'" class="space-y-4">
-                            <h3 class="font-semibold text-gray-800">Projekt-Einstellungen</h3>
+                            <h3 class="font-semibold text-gray-800">{{ t('project.settings') }}</h3>
                             <div>
-                                <label class="block text-sm text-gray-600 mb-1">Projektname</label>
+                                <label class="block text-sm text-gray-600 mb-1">{{ t('project.name') }}</label>
                                 <input v-model="currentProject.projekt.name" @input="saveToStorage" type="text" class="w-full border border-gray-300 rounded px-3 py-2 text-sm">
                             </div>
                             <div>
-                                <label class="block text-sm text-gray-600 mb-1">Beschreibung</label>
+                                <label class="block text-sm text-gray-600 mb-1">{{ t('project.description') }}</label>
                                 <textarea v-model="currentProject.projekt.beschreibung" @input="saveToStorage" rows="2" class="w-full border border-gray-300 rounded px-3 py-2 text-sm"></textarea>
                             </div>
                             <div class="grid grid-cols-2 gap-3">
                                 <div>
-                                    <label class="block text-sm text-gray-600 mb-1">Projektstart</label>
+                                    <label class="block text-sm text-gray-600 mb-1">{{ t('project.start') }}</label>
                                     <input v-model="currentProject.projekt.start" @input="saveToStorage" type="date" class="w-full border border-gray-300 rounded px-3 py-2 text-sm">
                                 </div>
                                 <div>
-                                    <label class="block text-sm text-gray-600 mb-1">Projektende</label>
+                                    <label class="block text-sm text-gray-600 mb-1">{{ t('project.end') }}</label>
                                     <input v-model="currentProject.projekt.ende" @input="saveToStorage" type="date" class="w-full border border-gray-300 rounded px-3 py-2 text-sm">
                                 </div>
                             </div>
                             <div class="pt-2 space-y-2">
                                 <label class="flex items-center space-x-2">
                                     <input type="checkbox" v-model="currentProject.einstellungen.heuteAnzeigen" @change="saveToStorage" class="rounded">
-                                    <span class="text-sm text-gray-600">Heute-Linie anzeigen</span>
+                                    <span class="text-sm text-gray-600">{{ t('project.showToday') }}</span>
                                 </label>
                                 <label class="flex items-center space-x-2">
                                     <input type="checkbox" v-model="currentProject.einstellungen.legendeAnzeigen" @change="saveToStorage" class="rounded">
-                                    <span class="text-sm text-gray-600">Legende anzeigen</span>
+                                    <span class="text-sm text-gray-600">{{ t('project.showLegend') }}</span>
                                 </label>
                             </div>
 
                             <!-- Farb-Kategorien -->
                             <div class="pt-4 border-t border-gray-200">
-                                <h4 class="text-sm font-medium text-gray-700 mb-3">Farb-Kategorien</h4>
+                                <h4 class="text-sm font-medium text-gray-700 mb-3">{{ t('project.colorCategories') }}</h4>
                                 <div class="space-y-2">
                                     <div class="flex items-center space-x-2">
                                         <div class="w-6 h-6 rounded" style="background-color: #166534;"></div>
                                         <input v-model="currentProject.einstellungen.farbNamen.gruen" @input="saveToStorage"
-                                               type="text" placeholder="Name für Grün"
+                                               type="text" :placeholder="t('project.colorGreen')"
                                                class="flex-1 border border-gray-300 rounded px-2 py-1 text-sm">
                                     </div>
                                     <div class="flex items-center space-x-2">
                                         <div class="w-6 h-6 rounded" style="background-color: #991B1B;"></div>
                                         <input v-model="currentProject.einstellungen.farbNamen.rot" @input="saveToStorage"
-                                               type="text" placeholder="Name für Rot"
+                                               type="text" :placeholder="t('project.colorRed')"
                                                class="flex-1 border border-gray-300 rounded px-2 py-1 text-sm">
                                     </div>
                                     <div class="flex items-center space-x-2">
                                         <div class="w-6 h-6 rounded" style="background-color: #450a0a;"></div>
                                         <input v-model="currentProject.einstellungen.farbNamen.dunkelrot" @input="saveToStorage"
-                                               type="text" placeholder="Name für Dunkelrot"
+                                               type="text" :placeholder="t('project.colorDarkRed')"
                                                class="flex-1 border border-gray-300 rounded px-2 py-1 text-sm">
                                     </div>
                                 </div>
-                                <p class="text-xs text-gray-500 mt-2">Diese Namen erscheinen in der Legende.</p>
+                                <p class="text-xs text-gray-500 mt-2">{{ t('project.colorInfo') }}</p>
                             </div>
                         </div>
 
                         <!-- Gruppen Tab -->
                         <div v-if="activeTab === 'gruppen'" class="space-y-4">
                             <div class="flex items-center justify-between">
-                                <h3 class="font-semibold text-gray-800">Gruppen</h3>
-                                <button @click="addGruppe" class="text-blue-600 hover:text-blue-800 text-sm font-medium">+ Gruppe</button>
+                                <h3 class="font-semibold text-gray-800">{{ t('groups.title') }}</h3>
+                                <button @click="addGruppe" class="text-blue-600 hover:text-blue-800 text-sm font-medium">{{ t('groups.add') }}</button>
                             </div>
-                            <p class="text-xs text-gray-500">Gruppen sind Überschriften, die Phasen und Meilensteine organisieren.</p>
+                            <p class="text-xs text-gray-500">{{ t('groups.info') }}</p>
                             <div class="space-y-2">
                                 <div v-for="(gruppe, index) in sortedGruppen" :key="gruppe.id"
                                      class="border border-gray-200 rounded p-3 bg-gray-50">
                                     <div class="flex items-center space-x-2 mb-2">
-                                        <input v-model="gruppe.name" @input="saveToStorage" type="text" placeholder="Gruppenname" class="flex-1 border border-gray-300 rounded px-2 py-1.5 text-sm font-medium">
+                                        <input v-model="gruppe.name" @input="saveToStorage" type="text" :placeholder="t('groups.placeholder')" class="flex-1 border border-gray-300 rounded px-2 py-1.5 text-sm font-medium">
                                     </div>
                                     <div class="flex items-center justify-between">
                                         <div class="flex items-center space-x-1">
                                             <button @click="moveGruppe(gruppe, -1)" :disabled="index === 0" class="text-gray-400 hover:text-gray-600 disabled:opacity-30 p-1 text-sm">↑</button>
                                             <button @click="moveGruppe(gruppe, 1)" :disabled="index === sortedGruppen.length - 1" class="text-gray-400 hover:text-gray-600 disabled:opacity-30 p-1 text-sm">↓</button>
                                         </div>
-                                        <button @click="deleteGruppe(gruppe.id)" class="text-red-400 hover:text-red-600 text-xs">Löschen</button>
+                                        <button @click="deleteGruppe(gruppe.id)" class="text-red-400 hover:text-red-600 text-xs">{{ t('common.delete') }}</button>
                                     </div>
                                 </div>
                                 <div v-if="currentProject.gruppen.length === 0" class="text-gray-400 text-sm p-2 text-center">
-                                    Keine Gruppen vorhanden
+                                    {{ t('groups.none') }}
                                 </div>
                             </div>
                         </div>
@@ -307,22 +311,22 @@
                             <!-- Header mit Ansichts-Umschalter -->
                             <div class="flex items-center justify-between">
                                 <div class="flex items-center space-x-3">
-                                    <h3 class="font-semibold text-gray-800">Elemente</h3>
+                                    <h3 class="font-semibold text-gray-800">{{ t('elements.title') }}</h3>
                                     <div class="flex border border-gray-300 rounded overflow-hidden text-xs">
                                         <button @click="elementeView = 'kompakt'"
                                                 :class="['px-2 py-1', elementeView === 'kompakt' ? 'bg-gray-700 text-white' : 'bg-white text-gray-600 hover:bg-gray-100']">
-                                            Liste
+                                            {{ t('elements.list') }}
                                         </button>
                                         <button @click="elementeView = 'tabelle'"
                                                 :class="['px-2 py-1', elementeView === 'tabelle' ? 'bg-gray-700 text-white' : 'bg-white text-gray-600 hover:bg-gray-100']">
-                                            Tabelle
+                                            {{ t('elements.table') }}
                                         </button>
                                     </div>
                                 </div>
                                 <div class="flex space-x-2">
-                                    <button @click="addElement('phase')" class="text-blue-600 hover:text-blue-800 text-sm font-medium">+ Phase</button>
-                                    <button @click="addElement('meilenstein')" class="text-green-600 hover:text-green-800 text-sm font-medium">+ MS</button>
-                                    <button @click="openBatchInput" class="text-purple-600 hover:text-purple-800 text-sm font-medium border-l border-gray-300 pl-2">+ Mehrere</button>
+                                    <button @click="addElement('phase')" class="text-blue-600 hover:text-blue-800 text-sm font-medium">{{ t('elements.addPhase') }}</button>
+                                    <button @click="addElement('meilenstein')" class="text-green-600 hover:text-green-800 text-sm font-medium">{{ t('elements.addMilestone') }}</button>
+                                    <button @click="openBatchInput" class="text-purple-600 hover:text-purple-800 text-sm font-medium border-l border-gray-300 pl-2">{{ t('elements.addMultiple') }}</button>
                                 </div>
                             </div>
 
@@ -360,7 +364,7 @@
                                                      :style="{ backgroundColor: element.typ === 'phase' ? (element.farbe === 'gruen' ? '#166534' : element.farbe === 'dunkelrot' ? '#450a0a' : '#991B1B') : 'transparent' }"
                                                      :class="element.typ === 'meilenstein' ? 'border-2 border-amber-600 transform rotate-45' : ''"></div>
                                                 <span :class="['flex-1 text-sm truncate', (element.einrueckung || 0) > 0 ? 'ml-' + (element.einrueckung * 3) : '']">
-                                                    {{ element.name || '(Unbenannt)' }}
+                                                    {{ element.name || t('elements.unnamed') }}
                                                 </span>
                                                 <span class="text-xs text-gray-400 ml-2">{{ getElementSummary(element) }}</span>
                                                 <div class="flex items-center ml-2 space-x-1" @click.stop>
@@ -373,13 +377,13 @@
                                             <div v-if="expandedElementId === element.id" class="px-3 pb-3 pt-2 border-t border-gray-100 bg-gray-50">
                                                 <div class="grid grid-cols-2 gap-2 mb-2">
                                                     <div>
-                                                        <label class="text-xs text-gray-500">Name</label>
+                                                        <label class="text-xs text-gray-500">{{ t('elements.name') }}</label>
                                                         <input v-model="element.name" @input="saveToStorage" type="text" class="w-full border border-gray-300 rounded px-2 py-1 text-sm">
                                                     </div>
                                                     <div>
-                                                        <label class="text-xs text-gray-500">Gruppe</label>
+                                                        <label class="text-xs text-gray-500">{{ t('elements.group') }}</label>
                                                         <select v-model="element.gruppe" @change="saveToStorage" class="w-full border border-gray-300 rounded px-2 py-1 text-sm bg-white">
-                                                            <option value="">-- Keine --</option>
+                                                            <option value="">{{ t('elements.noGroup') }}</option>
                                                             <option v-for="g in sortedGruppen" :key="g.id" :value="g.id">{{ g.name }}</option>
                                                         </select>
                                                     </div>
@@ -389,31 +393,31 @@
                                                 <div v-if="element.typ === 'phase'">
                                                     <div class="grid grid-cols-2 gap-2 mb-2">
                                                         <div>
-                                                            <label class="text-xs text-gray-500">Start</label>
+                                                            <label class="text-xs text-gray-500">{{ t('elements.start') }}</label>
                                                             <input v-model="element.start" @input="saveToStorage" type="date" class="w-full border border-gray-300 rounded px-2 py-1 text-sm">
                                                         </div>
                                                         <div>
-                                                            <label class="text-xs text-gray-500">Ende</label>
+                                                            <label class="text-xs text-gray-500">{{ t('elements.end') }}</label>
                                                             <input v-model="element.ende" @input="saveToStorage" type="date" class="w-full border border-gray-300 rounded px-2 py-1 text-sm">
                                                         </div>
                                                     </div>
                                                     <div class="flex items-center flex-wrap gap-2 mb-2">
                                                         <select v-model.number="element.einrueckung" @change="saveToStorage" class="border border-gray-300 rounded px-2 py-1 text-xs bg-white">
-                                                            <option :value="0">Ebene 1</option>
-                                                            <option :value="1">Ebene 2</option>
-                                                            <option :value="2">Ebene 3</option>
+                                                            <option :value="0">{{ t('elements.level1') }}</option>
+                                                            <option :value="1">{{ t('elements.level2') }}</option>
+                                                            <option :value="2">{{ t('elements.level3') }}</option>
                                                         </select>
                                                         <label class="flex items-center space-x-1">
                                                             <input type="checkbox" v-model="element.kritisch" @change="saveToStorage" class="rounded">
-                                                            <span class="text-xs text-gray-600">Kritisch</span>
+                                                            <span class="text-xs text-gray-600">{{ t('elements.critical') }}</span>
                                                         </label>
                                                         <div class="flex items-center space-x-1">
-                                                            <span class="text-xs text-gray-600">Puffer:</span>
+                                                            <span class="text-xs text-gray-600">{{ t('elements.buffer') }}:</span>
                                                             <input v-model.number="element.pufferTage" @input="saveToStorage" type="number" min="0" class="w-12 border border-gray-300 rounded px-1 py-0.5 text-xs">
                                                         </div>
                                                     </div>
                                                     <div class="flex items-center space-x-2">
-                                                        <span class="text-xs text-gray-600">Farbe:</span>
+                                                        <span class="text-xs text-gray-600">{{ t('elements.color') }}:</span>
                                                         <button @click="element.farbe = 'gruen'; saveToStorage()" :class="['w-5 h-5 rounded border-2', element.farbe === 'gruen' ? 'border-gray-800' : 'border-transparent']" style="background-color: #166534;"></button>
                                                         <button @click="element.farbe = 'rot'; saveToStorage()" :class="['w-5 h-5 rounded border-2', element.farbe === 'rot' ? 'border-gray-800' : 'border-transparent']" style="background-color: #991B1B;"></button>
                                                         <button @click="element.farbe = 'dunkelrot'; saveToStorage()" :class="['w-5 h-5 rounded border-2', element.farbe === 'dunkelrot' ? 'border-gray-800' : 'border-transparent']" style="background-color: #450a0a;"></button>
@@ -423,27 +427,27 @@
                                                 <!-- Meilenstein-spezifisch -->
                                                 <div v-if="element.typ === 'meilenstein'" class="grid grid-cols-2 gap-2">
                                                     <div>
-                                                        <label class="text-xs text-gray-500">Datum</label>
+                                                        <label class="text-xs text-gray-500">{{ t('elements.date') }}</label>
                                                         <input v-model="element.datum" @input="saveToStorage" type="date" class="w-full border border-gray-300 rounded px-2 py-1 text-sm">
                                                     </div>
                                                     <div>
-                                                        <label class="text-xs text-gray-500">Einrückung</label>
+                                                        <label class="text-xs text-gray-500">{{ t('elements.level') }}</label>
                                                         <select v-model.number="element.einrueckung" @change="saveToStorage" class="w-full border border-gray-300 rounded px-2 py-1 text-sm bg-white">
-                                                            <option :value="0">Ebene 1</option>
-                                                            <option :value="1">Ebene 2</option>
-                                                            <option :value="2">Ebene 3</option>
+                                                            <option :value="0">{{ t('elements.level1') }}</option>
+                                                            <option :value="1">{{ t('elements.level2') }}</option>
+                                                            <option :value="2">{{ t('elements.level3') }}</option>
                                                         </select>
                                                     </div>
                                                 </div>
 
                                                 <div class="flex justify-end space-x-2 mt-2 pt-2 border-t border-gray-200">
-                                                    <button @click="duplicateElement(element)" class="text-blue-500 hover:text-blue-700 text-xs">Duplizieren</button>
-                                                    <button @click="deleteElement(element.id)" class="text-red-500 hover:text-red-700 text-xs">Löschen</button>
+                                                    <button @click="duplicateElement(element)" class="text-blue-500 hover:text-blue-700 text-xs">{{ t('elements.duplicate') }}</button>
+                                                    <button @click="deleteElement(element.id)" class="text-red-500 hover:text-red-700 text-xs">{{ t('common.delete') }}</button>
                                                 </div>
                                             </div>
                                         </div>
                                         <div v-if="getElementeForGruppe(gruppe.id).length === 0" class="text-gray-400 text-xs py-2 pl-6">
-                                            Keine Elemente
+                                            {{ t('elements.none') }}
                                         </div>
                                     </div>
                                 </div>
@@ -454,7 +458,7 @@
                                          class="flex items-center justify-between bg-gray-50 px-2 py-1.5 rounded cursor-pointer hover:bg-gray-100">
                                         <div class="flex items-center space-x-2">
                                             <span class="text-gray-400 text-xs">{{ isGroupCollapsed('__none__') ? '▶' : '▼' }}</span>
-                                            <span class="text-sm font-medium text-gray-500">Ohne Gruppe</span>
+                                            <span class="text-sm font-medium text-gray-500">{{ t('elements.withoutGroup') }}</span>
                                             <span class="text-xs text-gray-400">({{ getElementeForGruppe('').length }})</span>
                                         </div>
                                     </div>
@@ -474,7 +478,7 @@
                                                 <div class="w-3 h-3 rounded-sm mr-2"
                                                      :style="{ backgroundColor: element.typ === 'phase' ? (element.farbe === 'gruen' ? '#166534' : element.farbe === 'dunkelrot' ? '#450a0a' : '#991B1B') : 'transparent' }"
                                                      :class="element.typ === 'meilenstein' ? 'border-2 border-amber-600 transform rotate-45' : ''"></div>
-                                                <span class="flex-1 text-sm truncate">{{ element.name || '(Unbenannt)' }}</span>
+                                                <span class="flex-1 text-sm truncate">{{ element.name || t('elements.unnamed') }}</span>
                                                 <span class="text-xs text-gray-400 ml-2">{{ getElementSummary(element) }}</span>
                                                 <div class="flex items-center ml-2 space-x-1" @click.stop>
                                                     <button @click="moveElement(element, -1)" class="text-gray-300 hover:text-gray-600 text-xs px-1">↑</button>
@@ -485,13 +489,13 @@
                                             <div v-if="expandedElementId === element.id" class="px-3 pb-3 pt-2 border-t border-gray-100 bg-gray-50">
                                                 <div class="grid grid-cols-2 gap-2 mb-2">
                                                     <div>
-                                                        <label class="text-xs text-gray-500">Name</label>
+                                                        <label class="text-xs text-gray-500">{{ t('elements.name') }}</label>
                                                         <input v-model="element.name" @input="saveToStorage" type="text" class="w-full border border-gray-300 rounded px-2 py-1 text-sm">
                                                     </div>
                                                     <div>
-                                                        <label class="text-xs text-gray-500">Gruppe</label>
+                                                        <label class="text-xs text-gray-500">{{ t('elements.group') }}</label>
                                                         <select v-model="element.gruppe" @change="saveToStorage" class="w-full border border-gray-300 rounded px-2 py-1 text-sm bg-white">
-                                                            <option value="">-- Keine --</option>
+                                                            <option value="">{{ t('elements.noGroup') }}</option>
                                                             <option v-for="g in sortedGruppen" :key="g.id" :value="g.id">{{ g.name }}</option>
                                                         </select>
                                                     </div>
@@ -499,31 +503,31 @@
                                                 <div v-if="element.typ === 'phase'">
                                                     <div class="grid grid-cols-2 gap-2 mb-2">
                                                         <div>
-                                                            <label class="text-xs text-gray-500">Start</label>
+                                                            <label class="text-xs text-gray-500">{{ t('elements.start') }}</label>
                                                             <input v-model="element.start" @input="saveToStorage" type="date" class="w-full border border-gray-300 rounded px-2 py-1 text-sm">
                                                         </div>
                                                         <div>
-                                                            <label class="text-xs text-gray-500">Ende</label>
+                                                            <label class="text-xs text-gray-500">{{ t('elements.end') }}</label>
                                                             <input v-model="element.ende" @input="saveToStorage" type="date" class="w-full border border-gray-300 rounded px-2 py-1 text-sm">
                                                         </div>
                                                     </div>
                                                     <div class="flex items-center flex-wrap gap-2 mb-2">
                                                         <select v-model.number="element.einrueckung" @change="saveToStorage" class="border border-gray-300 rounded px-2 py-1 text-xs bg-white">
-                                                            <option :value="0">Ebene 1</option>
-                                                            <option :value="1">Ebene 2</option>
-                                                            <option :value="2">Ebene 3</option>
+                                                            <option :value="0">{{ t('elements.level1') }}</option>
+                                                            <option :value="1">{{ t('elements.level2') }}</option>
+                                                            <option :value="2">{{ t('elements.level3') }}</option>
                                                         </select>
                                                         <label class="flex items-center space-x-1">
                                                             <input type="checkbox" v-model="element.kritisch" @change="saveToStorage" class="rounded">
-                                                            <span class="text-xs text-gray-600">Kritisch</span>
+                                                            <span class="text-xs text-gray-600">{{ t('elements.critical') }}</span>
                                                         </label>
                                                         <div class="flex items-center space-x-1">
-                                                            <span class="text-xs text-gray-600">Puffer:</span>
+                                                            <span class="text-xs text-gray-600">{{ t('elements.buffer') }}:</span>
                                                             <input v-model.number="element.pufferTage" @input="saveToStorage" type="number" min="0" class="w-12 border border-gray-300 rounded px-1 py-0.5 text-xs">
                                                         </div>
                                                     </div>
                                                     <div class="flex items-center space-x-2">
-                                                        <span class="text-xs text-gray-600">Farbe:</span>
+                                                        <span class="text-xs text-gray-600">{{ t('elements.color') }}:</span>
                                                         <button @click="element.farbe = 'gruen'; saveToStorage()" :class="['w-5 h-5 rounded border-2', element.farbe === 'gruen' ? 'border-gray-800' : 'border-transparent']" style="background-color: #166534;"></button>
                                                         <button @click="element.farbe = 'rot'; saveToStorage()" :class="['w-5 h-5 rounded border-2', element.farbe === 'rot' ? 'border-gray-800' : 'border-transparent']" style="background-color: #991B1B;"></button>
                                                         <button @click="element.farbe = 'dunkelrot'; saveToStorage()" :class="['w-5 h-5 rounded border-2', element.farbe === 'dunkelrot' ? 'border-gray-800' : 'border-transparent']" style="background-color: #450a0a;"></button>
@@ -531,21 +535,21 @@
                                                 </div>
                                                 <div v-if="element.typ === 'meilenstein'" class="grid grid-cols-2 gap-2">
                                                     <div>
-                                                        <label class="text-xs text-gray-500">Datum</label>
+                                                        <label class="text-xs text-gray-500">{{ t('elements.date') }}</label>
                                                         <input v-model="element.datum" @input="saveToStorage" type="date" class="w-full border border-gray-300 rounded px-2 py-1 text-sm">
                                                     </div>
                                                     <div>
-                                                        <label class="text-xs text-gray-500">Einrückung</label>
+                                                        <label class="text-xs text-gray-500">{{ t('elements.level') }}</label>
                                                         <select v-model.number="element.einrueckung" @change="saveToStorage" class="w-full border border-gray-300 rounded px-2 py-1 text-sm bg-white">
-                                                            <option :value="0">Ebene 1</option>
-                                                            <option :value="1">Ebene 2</option>
-                                                            <option :value="2">Ebene 3</option>
+                                                            <option :value="0">{{ t('elements.level1') }}</option>
+                                                            <option :value="1">{{ t('elements.level2') }}</option>
+                                                            <option :value="2">{{ t('elements.level3') }}</option>
                                                         </select>
                                                     </div>
                                                 </div>
                                                 <div class="flex justify-end space-x-2 mt-2 pt-2 border-t border-gray-200">
-                                                    <button @click="duplicateElement(element)" class="text-blue-500 hover:text-blue-700 text-xs">Duplizieren</button>
-                                                    <button @click="deleteElement(element.id)" class="text-red-500 hover:text-red-700 text-xs">Löschen</button>
+                                                    <button @click="duplicateElement(element)" class="text-blue-500 hover:text-blue-700 text-xs">{{ t('elements.duplicate') }}</button>
+                                                    <button @click="deleteElement(element.id)" class="text-red-500 hover:text-red-700 text-xs">{{ t('common.delete') }}</button>
                                                 </div>
                                             </div>
                                         </div>
@@ -559,12 +563,12 @@
                                     <thead>
                                         <tr class="bg-gray-100">
                                             <th class="text-left p-1.5 border-b border-gray-300 w-8"></th>
-                                            <th class="text-left p-1.5 border-b border-gray-300">Name</th>
-                                            <th class="text-left p-1.5 border-b border-gray-300 w-20">Typ</th>
-                                            <th class="text-left p-1.5 border-b border-gray-300 w-24">Start</th>
-                                            <th class="text-left p-1.5 border-b border-gray-300 w-24">Ende</th>
-                                            <th class="text-left p-1.5 border-b border-gray-300 w-16">Farbe</th>
-                                            <th class="text-left p-1.5 border-b border-gray-300 w-20">Aktionen</th>
+                                            <th class="text-left p-1.5 border-b border-gray-300">{{ t('elements.name') }}</th>
+                                            <th class="text-left p-1.5 border-b border-gray-300 w-20">{{ t('elements.type') }}</th>
+                                            <th class="text-left p-1.5 border-b border-gray-300 w-24">{{ t('elements.start') }}</th>
+                                            <th class="text-left p-1.5 border-b border-gray-300 w-24">{{ t('elements.end') }}</th>
+                                            <th class="text-left p-1.5 border-b border-gray-300 w-16">{{ t('elements.color') }}</th>
+                                            <th class="text-left p-1.5 border-b border-gray-300 w-20">{{ t('elements.actions') }}</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -591,7 +595,7 @@
                                                 </td>
                                                 <td class="p-1">
                                                     <span :class="element.typ === 'phase' ? 'text-red-600' : 'text-amber-600'">
-                                                        {{ element.typ === 'phase' ? 'Phase' : 'MS' }}
+                                                        {{ element.typ === 'phase' ? t('elements.phase') : t('elements.milestone') }}
                                                     </span>
                                                 </td>
                                                 <td class="p-1">
@@ -615,8 +619,8 @@
                                                 </td>
                                                 <td class="p-1">
                                                     <div class="flex space-x-1">
-                                                        <button @click="duplicateElement(element)" class="text-blue-400 hover:text-blue-600" title="Duplizieren">D</button>
-                                                        <button @click="deleteElement(element.id)" class="text-red-400 hover:text-red-600" title="Löschen">X</button>
+                                                        <button @click="duplicateElement(element)" class="text-blue-400 hover:text-blue-600" :title="t('elements.duplicate')">D</button>
+                                                        <button @click="deleteElement(element.id)" class="text-red-400 hover:text-red-600" :title="t('common.delete')">X</button>
                                                     </div>
                                                 </td>
                                             </tr>
@@ -624,7 +628,7 @@
                                         <!-- Ohne Gruppe -->
                                         <template v-if="getElementeForGruppe('').length > 0">
                                             <tr class="bg-gray-50">
-                                                <td colspan="7" class="p-1.5 font-medium text-gray-500 border-b border-gray-200">Ohne Gruppe</td>
+                                                <td colspan="7" class="p-1.5 font-medium text-gray-500 border-b border-gray-200">{{ t('elements.withoutGroup') }}</td>
                                             </tr>
                                             <tr v-for="element in getElementeForGruppe('')" :key="'tbl-ng-' + element.id"
                                                 class="hover:bg-blue-50 border-b border-gray-100"
@@ -636,7 +640,7 @@
                                                 @dragend="onDragEnd($event)">
                                                 <td class="p-1 text-center"><span class="drag-handle text-gray-400 cursor-grab">⋮⋮</span></td>
                                                 <td class="p-1"><input v-model="element.name" @input="saveToStorage" type="text" class="w-full border border-transparent hover:border-gray-300 focus:border-blue-400 rounded px-1 py-0.5 bg-transparent"></td>
-                                                <td class="p-1"><span :class="element.typ === 'phase' ? 'text-red-600' : 'text-amber-600'">{{ element.typ === 'phase' ? 'Phase' : 'MS' }}</span></td>
+                                                <td class="p-1"><span :class="element.typ === 'phase' ? 'text-red-600' : 'text-amber-600'">{{ element.typ === 'phase' ? t('elements.phase') : t('elements.milestone') }}</span></td>
                                                 <td class="p-1">
                                                     <input v-if="element.typ === 'phase'" v-model="element.start" @input="saveToStorage" type="date" class="w-full border border-transparent hover:border-gray-300 focus:border-blue-400 rounded px-1 py-0.5 bg-transparent text-xs">
                                                     <input v-else v-model="element.datum" @input="saveToStorage" type="date" class="w-full border border-transparent hover:border-gray-300 focus:border-blue-400 rounded px-1 py-0.5 bg-transparent text-xs">
@@ -666,8 +670,8 @@
                             </div>
 
                             <div v-if="currentProject.elemente.length === 0" class="text-gray-400 text-sm p-4 text-center border border-dashed border-gray-300 rounded">
-                                Keine Phasen oder Meilensteine vorhanden.<br>
-                                Erstellen Sie zuerst Gruppen, dann fügen Sie Elemente hinzu.
+                                {{ t('elements.noneExist') }}<br>
+                                {{ t('elements.createGroupsFirst') }}
                             </div>
                         </div>
                     </div>
@@ -695,15 +699,15 @@
                                 </template>
                                 <div v-if="hasBuffer" class="flex items-center space-x-2">
                                     <svg width="32" height="12"><line x1="0" y1="6" x2="32" y2="6" :stroke="themeColors.milestone" stroke-width="3" stroke-dasharray="8,4"/></svg>
-                                    <span :class="darkMode ? 'text-gray-300' : 'text-gray-600'">Zeitreserve</span>
+                                    <span :class="darkMode ? 'text-gray-300' : 'text-gray-600'">{{ t('timeline.buffer') }}</span>
                                 </div>
                                 <div v-if="hasMilestones" class="flex items-center space-x-2">
                                     <svg width="16" height="16" viewBox="0 0 16 16"><polygon points="8,2 14,8 8,14 2,8" fill="none" :stroke="themeColors.milestone" stroke-width="1.5"/></svg>
-                                    <span :class="darkMode ? 'text-gray-300' : 'text-gray-600'">Meilenstein</span>
+                                    <span :class="darkMode ? 'text-gray-300' : 'text-gray-600'">{{ t('timeline.milestone') }}</span>
                                 </div>
                                 <div v-if="hasCritical" class="flex items-center space-x-2">
                                     <div class="w-0.5 h-4" :class="darkMode ? 'bg-gray-300' : 'bg-gray-800'"></div>
-                                    <span :class="darkMode ? 'text-gray-300' : 'text-gray-600'">Kritischer Pfad</span>
+                                    <span :class="darkMode ? 'text-gray-300' : 'text-gray-600'">{{ t('timeline.criticalPath') }}</span>
                                 </div>
                             </div>
 
@@ -746,7 +750,7 @@
                                 <!-- Heute-Markierung oben -->
                                 <g v-if="currentProject.einstellungen.heuteAnzeigen && todayX >= labelWidth" class="today-marker">
                                     <rect :x="todayX - 25" y="2" width="50" height="18" :fill="themeColors.todayBg" rx="2"/>
-                                    <text :x="todayX" y="14" text-anchor="middle" font-size="10" fill="white" font-weight="500">Heute</text>
+                                    <text :x="todayX" y="14" text-anchor="middle" font-size="10" fill="white" font-weight="500">{{ t('timeline.today') }}</text>
                                 </g>
 
                                 <!-- Content Rows -->
@@ -907,7 +911,7 @@
                                     <line x1="50" :y1="todayY" :x2="verticalCanvasWidth - 50" :y2="todayY"
                                           :stroke="themeColors.todayBg" stroke-width="2"/>
                                     <rect :x="verticalCanvasWidth - 70" :y="todayY - 10" width="50" height="18" :fill="themeColors.todayBg" rx="2"/>
-                                    <text :x="verticalCanvasWidth - 45" :y="todayY + 3" text-anchor="middle" font-size="9" fill="white" font-weight="500">Heute</text>
+                                    <text :x="verticalCanvasWidth - 45" :y="todayY + 3" text-anchor="middle" font-size="9" fill="white" font-weight="500">{{ t('timeline.today') }}</text>
                                 </g>
                             </svg>
                         </div>
@@ -919,10 +923,10 @@
         <!-- Export Modal -->
         <div v-if="showExportModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div class="bg-white rounded-lg shadow-xl p-6 w-96">
-                <h3 class="text-lg font-semibold mb-4">Timeline exportieren</h3>
+                <h3 class="text-lg font-semibold mb-4">{{ t('export.title') }}</h3>
                 <div class="space-y-4">
                     <div>
-                        <label class="block text-sm text-gray-600 mb-1">Format</label>
+                        <label class="block text-sm text-gray-600 mb-1">{{ t('export.format') }}</label>
                         <div class="flex space-x-4">
                             <label class="flex items-center space-x-2">
                                 <input type="radio" v-model="exportSettings.format" value="png">
@@ -935,17 +939,17 @@
                         </div>
                     </div>
                     <div v-if="exportSettings.format === 'png'">
-                        <label class="block text-sm text-gray-600 mb-1">Skalierung</label>
+                        <label class="block text-sm text-gray-600 mb-1">{{ t('export.scale') }}</label>
                         <select v-model.number="exportSettings.scale" class="w-full border border-gray-300 rounded px-3 py-2">
-                            <option :value="1">1x (Standard)</option>
-                            <option :value="2">2x (Hohe Auflösung)</option>
-                            <option :value="3">3x (Sehr hohe Auflösung)</option>
+                            <option :value="1">{{ t('export.scale1x') }}</option>
+                            <option :value="2">{{ t('export.scale2x') }}</option>
+                            <option :value="3">{{ t('export.scale3x') }}</option>
                         </select>
                     </div>
                 </div>
                 <div class="flex justify-end space-x-3 mt-6">
-                    <button @click="showExportModal = false" class="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50">Abbrechen</button>
-                    <button @click="exportTimeline" class="px-4 py-2 bg-red-700 text-white rounded hover:bg-red-800">Exportieren</button>
+                    <button @click="showExportModal = false" class="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50">{{ t('common.cancel') }}</button>
+                    <button @click="exportTimeline" class="px-4 py-2 bg-red-700 text-white rounded hover:bg-red-800">{{ t('export.export') }}</button>
                 </div>
             </div>
         </div>
@@ -953,39 +957,39 @@
         <!-- JSON/CSV Import/Export Modal -->
         <div v-if="showImportExportModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div class="bg-white rounded-lg shadow-xl p-6 w-[600px] max-h-[90vh] overflow-y-auto">
-                <h3 class="text-lg font-semibold mb-4">Import/Export</h3>
+                <h3 class="text-lg font-semibold mb-4">{{ t('import.title') }}</h3>
 
                 <!-- CSV Import Section -->
                 <div class="mb-6 p-4 bg-green-50 border border-green-200 rounded">
-                    <h4 class="font-medium text-green-800 mb-2">CSV Import (aus Excel)</h4>
+                    <h4 class="font-medium text-green-800 mb-2">{{ t('import.csvTitle') }}</h4>
                     <p class="text-xs text-green-700 mb-3">
-                        Importiere Projektdaten aus einer CSV-Datei. Erstelle die Datei in Excel und speichere sie als CSV (Semikolon-getrennt).
+                        {{ t('import.csvInfo') }}
                     </p>
                     <div class="flex items-center space-x-2">
                         <label class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 cursor-pointer text-sm">
-                            CSV-Datei auswählen
+                            {{ t('import.selectFile') }}
                             <input type="file" accept=".csv" @change="handleCsvFileSelect" class="hidden">
                         </label>
                         <button @click="downloadCsvTemplate" class="px-4 py-2 border border-green-600 text-green-600 rounded hover:bg-green-50 text-sm">
-                            Vorlage herunterladen
+                            {{ t('import.downloadTemplate') }}
                         </button>
                     </div>
                 </div>
 
                 <!-- JSON Section -->
                 <div class="space-y-4">
-                    <h4 class="font-medium text-gray-700">JSON Import/Export</h4>
+                    <h4 class="font-medium text-gray-700">{{ t('import.jsonTitle') }}</h4>
                     <div>
-                        <label class="block text-sm text-gray-600 mb-1">Projekt-JSON</label>
+                        <label class="block text-sm text-gray-600 mb-1">{{ t('import.projectJson') }}</label>
                         <textarea v-model="jsonDataInput" rows="12" class="w-full border border-gray-300 rounded px-3 py-2 font-mono text-xs"></textarea>
                     </div>
                 </div>
                 <div class="flex justify-between mt-6">
                     <div class="space-x-2">
-                        <button @click="copyJsonToClipboard" class="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50">Kopieren</button>
-                        <button @click="importFromJson" class="px-4 py-2 border border-blue-500 text-blue-600 rounded hover:bg-blue-50">JSON Importieren</button>
+                        <button @click="copyJsonToClipboard" class="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50">{{ t('import.copy') }}</button>
+                        <button @click="importFromJson" class="px-4 py-2 border border-blue-500 text-blue-600 rounded hover:bg-blue-50">{{ t('import.importJson') }}</button>
                     </div>
-                    <button @click="showImportExportModal = false" class="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300">Schließen</button>
+                    <button @click="showImportExportModal = false" class="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300">{{ t('common.close') }}</button>
                 </div>
             </div>
         </div>
@@ -993,11 +997,11 @@
         <!-- Vorlagen Modal -->
         <div v-if="showTemplatesModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div class="bg-white rounded-lg shadow-xl p-6 w-[500px] max-h-[80vh] flex flex-col">
-                <h3 class="text-lg font-semibold mb-4">Vorlagen verwalten</h3>
+                <h3 class="text-lg font-semibold mb-4">{{ t('templates.title') }}</h3>
                 <div class="flex-1 overflow-y-auto">
                     <div v-if="templates.length === 0" class="text-gray-400 text-center py-8">
-                        Keine Vorlagen gespeichert.<br>
-                        <span class="text-sm">Speichere ein Projekt als Vorlage über "Als Vorlage speichern".</span>
+                        {{ t('templates.noneExist') }}<br>
+                        <span class="text-sm">{{ t('templates.saveHint') }}</span>
                     </div>
                     <div v-else class="space-y-2">
                         <div v-for="template in templates" :key="template.id"
@@ -1006,15 +1010,15 @@
                                 <div>
                                     <div class="font-medium text-gray-800">{{ template.name }}</div>
                                     <div class="text-xs text-gray-500">
-                                        {{ template.gruppen?.length || 0 }} Gruppen,
-                                        {{ template.elemente?.length || 0 }} Elemente
+                                        {{ template.gruppen?.length || 0 }} {{ t('templates.groups') }},
+                                        {{ template.elemente?.length || 0 }} {{ t('templates.elements') }}
                                     </div>
-                                    <div class="text-xs text-gray-400">Erstellt: {{ formatDateShort(template.erstelltAm) }}</div>
+                                    <div class="text-xs text-gray-400">{{ t('templates.created') }}: {{ formatDateShort(template.erstelltAm) }}</div>
                                 </div>
                                 <div class="flex items-center space-x-2">
                                     <button @click="createFromTemplate(template); showTemplatesModal = false"
                                             class="px-3 py-1 text-sm bg-green-500 text-white rounded hover:bg-green-600">
-                                        Verwenden
+                                        {{ t('templates.use') }}
                                     </button>
                                     <button @click="exportTemplateAsJson(template)"
                                             class="px-2 py-1 text-sm border border-gray-300 rounded hover:bg-gray-100">
@@ -1022,7 +1026,7 @@
                                     </button>
                                     <button @click="deleteTemplate(template.id)"
                                             class="px-2 py-1 text-sm text-red-500 hover:text-red-700 hover:bg-red-50 rounded">
-                                        Löschen
+                                        {{ t('common.delete') }}
                                     </button>
                                 </div>
                             </div>
@@ -1031,9 +1035,9 @@
                 </div>
                 <div class="flex justify-between mt-6 pt-4 border-t border-gray-200">
                     <button @click="importTemplateFromJson" class="px-4 py-2 border border-blue-500 text-blue-600 rounded hover:bg-blue-50">
-                        Vorlage importieren
+                        {{ t('templates.import') }}
                     </button>
-                    <button @click="showTemplatesModal = false" class="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300">Schließen</button>
+                    <button @click="showTemplatesModal = false" class="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300">{{ t('common.close') }}</button>
                 </div>
             </div>
         </div>
@@ -1041,21 +1045,20 @@
         <!-- Vorlage speichern Modal -->
         <div v-if="showSaveTemplateModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div class="bg-white rounded-lg shadow-xl p-6 w-96">
-                <h3 class="text-lg font-semibold mb-4">Als Vorlage speichern</h3>
+                <h3 class="text-lg font-semibold mb-4">{{ t('saveTemplate.title') }}</h3>
                 <div class="space-y-4">
                     <div>
-                        <label class="block text-sm text-gray-600 mb-1">Vorlagenname</label>
+                        <label class="block text-sm text-gray-600 mb-1">{{ t('saveTemplate.name') }}</label>
                         <input v-model="newTemplateName" type="text" class="w-full border border-gray-300 rounded px-3 py-2"
-                               placeholder="z.B. Standard Transition" @keyup.enter="confirmSaveTemplate">
+                               :placeholder="t('saveTemplate.placeholder')" @keyup.enter="confirmSaveTemplate">
                     </div>
                     <p class="text-xs text-gray-500">
-                        Die Vorlage enthält alle Gruppen und Elemente des aktuellen Projekts.
-                        Beim Erstellen eines neuen Projekts werden die Daten relativ zum neuen Startdatum angepasst.
+                        {{ t('saveTemplate.info') }}
                     </p>
                 </div>
                 <div class="flex justify-end space-x-3 mt-6">
-                    <button @click="showSaveTemplateModal = false" class="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50">Abbrechen</button>
-                    <button @click="confirmSaveTemplate" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">Speichern</button>
+                    <button @click="showSaveTemplateModal = false" class="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50">{{ t('common.cancel') }}</button>
+                    <button @click="confirmSaveTemplate" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">{{ t('common.save') }}</button>
                 </div>
             </div>
         </div>
@@ -1063,34 +1066,34 @@
         <!-- Batch-Eingabe Modal -->
         <div v-if="showBatchInputModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div class="bg-white rounded-lg shadow-xl p-6 w-[600px]">
-                <h3 class="text-lg font-semibold mb-4">Mehrere Elemente hinzufügen</h3>
+                <h3 class="text-lg font-semibold mb-4">{{ t('batch.title') }}</h3>
                 <div class="space-y-4">
                     <div>
-                        <label class="block text-sm text-gray-600 mb-1">Ziel-Gruppe</label>
+                        <label class="block text-sm text-gray-600 mb-1">{{ t('batch.targetGroup') }}</label>
                         <select v-model="batchInputGruppe" class="w-full border border-gray-300 rounded px-3 py-2 text-sm bg-white">
-                            <option value="">-- Keine Gruppe --</option>
+                            <option value="">{{ t('batch.noGroup') }}</option>
                             <option v-for="g in sortedGruppen" :key="g.id" :value="g.id">{{ g.name }}</option>
                         </select>
                     </div>
                     <div>
-                        <label class="block text-sm text-gray-600 mb-1">Elemente (eine Zeile pro Element)</label>
+                        <label class="block text-sm text-gray-600 mb-1">{{ t('batch.elements') }}</label>
                         <textarea v-model="batchInputText" rows="10" class="w-full border border-gray-300 rounded px-3 py-2 font-mono text-xs"
                                   placeholder="phase;Analyse;2025-01-01;2025-01-31;gruen
 phase;Konzeption;2025-02-01;2025-02-28;rot;14;ja
 meilenstein;Kickoff;2025-01-15"></textarea>
                     </div>
                     <div class="text-xs text-gray-500 bg-gray-50 p-3 rounded">
-                        <strong>Format:</strong><br>
-                        Phase: <code>phase;Name;Start;Ende;Farbe;Puffer;Kritisch</code><br>
-                        Meilenstein: <code>meilenstein;Name;Datum</code><br><br>
-                        <strong>Farben:</strong> gruen, rot, dunkelrot<br>
-                        <strong>Datum:</strong> YYYY-MM-DD oder DD.MM.YYYY<br>
-                        <strong>Kritisch:</strong> ja oder leer lassen
+                        <strong>{{ t('batch.formatLabel') }}:</strong><br>
+                        {{ t('batch.phaseFormat') }}: <code>phase;Name;Start;Ende;Farbe;Puffer;Kritisch</code><br>
+                        {{ t('batch.milestoneFormat') }}: <code>meilenstein;Name;Datum</code><br><br>
+                        <strong>{{ t('batch.colorsLabel') }}:</strong> gruen, rot, dunkelrot<br>
+                        <strong>{{ t('batch.dateLabel') }}:</strong> YYYY-MM-DD {{ t('batch.or') }} DD.MM.YYYY<br>
+                        <strong>{{ t('batch.criticalLabel') }}:</strong> {{ t('batch.criticalHint') }}
                     </div>
                 </div>
                 <div class="flex justify-end space-x-3 mt-6">
-                    <button @click="showBatchInputModal = false" class="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50">Abbrechen</button>
-                    <button @click="processBatchInput" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Hinzufügen</button>
+                    <button @click="showBatchInputModal = false" class="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50">{{ t('common.cancel') }}</button>
+                    <button @click="processBatchInput" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">{{ t('common.add') }}</button>
                 </div>
             </div>
         </div>
@@ -1154,6 +1157,370 @@ meilenstein;Kickoff;2025-01-15"></textarea>
                 rot: '#991B1B',
                 dunkelrot: '#450a0a'
             };
+
+            // Internationalisierung (i18n)
+            const translations = {
+                de: {
+                    // Sidebar
+                    'sidebar.projects': 'Projekte',
+                    'sidebar.new': '+ Neu',
+                    'sidebar.duplicate': 'Duplizieren',
+                    'sidebar.saveAsTemplate': 'Als Vorlage speichern',
+                    'sidebar.delete': 'Löschen',
+                    'sidebar.templates': 'Vorlagen',
+                    'sidebar.manage': 'Verwalten',
+                    'sidebar.noProjects': 'Keine Projekte vorhanden',
+                    'sidebar.noTemplates': 'Keine Vorlagen gespeichert',
+                    'sidebar.newFromTemplate': '+ Neues Projekt (Vorlage)',
+                    // Toolbar
+                    'toolbar.project': 'Projekt',
+                    'toolbar.groups': 'Gruppen',
+                    'toolbar.elements': 'Phasen & Meilensteine',
+                    'toolbar.timeScale': 'Zeitskala:',
+                    'toolbar.months': 'Monate',
+                    'toolbar.quarters': 'Quartale',
+                    'toolbar.export': 'Export',
+                    'toolbar.json': 'JSON',
+                    'toolbar.darkTheme': 'Dunkles Theme',
+                    'toolbar.lightTheme': 'Helles Theme',
+                    'toolbar.verticalRoadmap': 'Vertikale Roadmap',
+                    'toolbar.execSummary': 'Executive Summary',
+                    // Editor - Projekt
+                    'project.settings': 'Projekt-Einstellungen',
+                    'project.name': 'Projektname',
+                    'project.description': 'Beschreibung',
+                    'project.start': 'Projektstart',
+                    'project.end': 'Projektende',
+                    'project.showToday': 'Heute-Linie anzeigen',
+                    'project.showLegend': 'Legende anzeigen',
+                    'project.colorCategories': 'Farb-Kategorien',
+                    'project.colorGreen': 'Name für Grün',
+                    'project.colorRed': 'Name für Rot',
+                    'project.colorDarkRed': 'Name für Dunkelrot',
+                    'project.colorInfo': 'Diese Namen erscheinen in der Legende.',
+                    'project.noSelected': 'Kein Projekt ausgewählt',
+                    'project.createNew': '+ Neues Projekt erstellen',
+                    // Editor - Gruppen
+                    'groups.title': 'Gruppen',
+                    'groups.add': '+ Gruppe',
+                    'groups.info': 'Gruppen sind Überschriften, die Phasen und Meilensteine organisieren.',
+                    'groups.placeholder': 'Gruppenname',
+                    'groups.none': 'Keine Gruppen vorhanden',
+                    // Editor - Elemente
+                    'elements.title': 'Elemente',
+                    'elements.list': 'Liste',
+                    'elements.table': 'Tabelle',
+                    'elements.addPhase': '+ Phase',
+                    'elements.addMilestone': '+ MS',
+                    'elements.addMultiple': '+ Mehrere',
+                    'elements.name': 'Name',
+                    'elements.group': 'Gruppe',
+                    'elements.noGroup': '-- Keine --',
+                    'elements.start': 'Start',
+                    'elements.end': 'Ende',
+                    'elements.date': 'Datum',
+                    'elements.level': 'Einrückung',
+                    'elements.level1': 'Ebene 1',
+                    'elements.level2': 'Ebene 2',
+                    'elements.level3': 'Ebene 3',
+                    'elements.critical': 'Kritisch',
+                    'elements.buffer': 'Puffer:',
+                    'elements.color': 'Farbe:',
+                    'elements.duplicate': 'Duplizieren',
+                    'elements.delete': 'Löschen',
+                    'elements.none': 'Keine Elemente',
+                    'elements.withoutGroup': 'Ohne Gruppe',
+                    'elements.type': 'Typ',
+                    'elements.phase': 'Phase',
+                    'elements.milestone': 'MS',
+                    'elements.actions': 'Aktionen',
+                    'elements.drag': 'Ziehen',
+                    'elements.unnamed': '(Unbenannt)',
+                    'elements.noneExist': 'Keine Phasen oder Meilensteine vorhanden.',
+                    'elements.createGroupsFirst': 'Erstellen Sie zuerst Gruppen, dann fügen Sie Elemente hinzu.',
+                    // Timeline
+                    'timeline.theme': 'Thema',
+                    'timeline.today': 'Heute',
+                    'timeline.buffer': 'Zeitreserve',
+                    'timeline.milestone': 'Meilenstein',
+                    'timeline.criticalPath': 'Kritischer Pfad',
+                    // Modals - Export
+                    'export.title': 'Timeline exportieren',
+                    'export.format': 'Format',
+                    'export.scale': 'Skalierung',
+                    'export.scale1x': '1x (Standard)',
+                    'export.scale2x': '2x (Hohe Auflösung)',
+                    'export.scale3x': '3x (Sehr hohe Auflösung)',
+                    'export.export': 'Exportieren',
+                    // Modals - Import/Export
+                    'import.title': 'Import/Export',
+                    'import.csvTitle': 'CSV Import (aus Excel)',
+                    'import.csvInfo': 'Importiere Projektdaten aus einer CSV-Datei. Erstelle die Datei in Excel und speichere sie als CSV (Semikolon-getrennt).',
+                    'import.selectFile': 'CSV-Datei auswählen',
+                    'import.downloadTemplate': 'Vorlage herunterladen',
+                    'import.jsonTitle': 'JSON Import/Export',
+                    'import.projectJson': 'Projekt-JSON',
+                    'import.copy': 'Kopieren',
+                    'import.importJson': 'JSON Importieren',
+                    // Modals - Vorlagen
+                    'templates.title': 'Vorlagen verwalten',
+                    'templates.noneExist': 'Keine Vorlagen gespeichert.',
+                    'templates.saveHint': 'Speichere ein Projekt als Vorlage über "Als Vorlage speichern".',
+                    'templates.groups': 'Gruppen',
+                    'templates.elements': 'Elemente',
+                    'templates.created': 'Erstellt',
+                    'templates.use': 'Verwenden',
+                    'templates.import': 'Vorlage importieren',
+                    // Modals - Vorlage speichern
+                    'saveTemplate.title': 'Als Vorlage speichern',
+                    'saveTemplate.name': 'Vorlagenname',
+                    'saveTemplate.placeholder': 'z.B. Standard Transition',
+                    'saveTemplate.info': 'Die Vorlage enthält alle Gruppen und Elemente des aktuellen Projekts. Beim Erstellen eines neuen Projekts werden die Daten relativ zum neuen Startdatum angepasst.',
+                    // Modals - Batch
+                    'batch.title': 'Mehrere Elemente hinzufügen',
+                    'batch.targetGroup': 'Ziel-Gruppe',
+                    'batch.noGroup': '-- Keine Gruppe --',
+                    'batch.elements': 'Elemente (eine Zeile pro Element)',
+                    'batch.formatLabel': 'Format',
+                    'batch.phaseFormat': 'Phase',
+                    'batch.milestoneFormat': 'Meilenstein',
+                    'batch.colorsLabel': 'Farben',
+                    'batch.dateLabel': 'Datum',
+                    'batch.or': 'oder',
+                    'batch.criticalLabel': 'Kritisch',
+                    'batch.criticalHint': 'ja oder leer lassen',
+                    // Common
+                    'common.cancel': 'Abbrechen',
+                    'common.save': 'Speichern',
+                    'common.close': 'Schließen',
+                    'common.add': 'Hinzufügen',
+                    'common.delete': 'Löschen',
+                    'common.export': 'Exportieren',
+                    'common.days': 'Tage',
+                    // Defaults
+                    'default.newProject': 'Neues Projekt',
+                    'default.newGroup': 'Neue Gruppe',
+                    'default.newPhase': 'Neue Phase',
+                    'default.newMilestone': 'Neuer Meilenstein',
+                    'default.preparation': 'Vorbereitung',
+                    'default.planDuration': 'Plandauer',
+                    'default.critical': 'Kritisch',
+                    'default.phaseplan': 'Phasenplan',
+                    'default.csvImport': 'CSV Import',
+                    'default.fromTemplate': 'Neues Projekt (aus {name})',
+                    'default.copy': '(Kopie)',
+                    // Alerts & Confirms
+                    'confirm.deleteProject': 'Projekt "{name}" wirklich löschen?',
+                    'confirm.deleteGroup': 'Gruppe "{name}" wirklich löschen? Elemente werden nicht gelöscht.',
+                    'confirm.deleteTemplate': 'Vorlage "{name}" wirklich löschen?',
+                    'alert.templateSaved': 'Vorlage "{name}" gespeichert!',
+                    'alert.templateImported': 'Vorlage "{name}" importiert!',
+                    'alert.jsonCopied': 'JSON in Zwischenablage kopiert',
+                    'alert.templateJsonCopied': 'Vorlage-JSON in Zwischenablage kopiert',
+                    'alert.importSuccess': 'Projekt erfolgreich importiert',
+                    'alert.csvSuccess': 'CSV-Import erfolgreich! {groups} Gruppe(n), {elements} Element(e) erstellt.',
+                    'alert.elementsAdded': '{count} Element(e) hinzugefügt.',
+                    'error.invalidFormat': 'Ungültiges Projektformat',
+                    'error.invalidTemplateFormat': 'Ungültiges Vorlagenformat',
+                    'error.importFailed': 'Import fehlgeschlagen:',
+                    'error.copyFailed': 'Kopieren fehlgeschlagen:',
+                    'error.exportFailed': 'Export fehlgeschlagen:',
+                    'error.csvMinRows': 'CSV muss mindestens eine Kopfzeile und eine Datenzeile enthalten',
+                    'error.csvMissingColumn': 'CSV fehlt erforderliche Spalte:',
+                    'error.invalidDate': 'Zeile {line}: Ungültiges Datum für {type} "{name}"',
+                    'error.unknownType': 'Zeile {line}: Unbekannter Typ "{type}"',
+                    'error.errors': 'Fehler:',
+                    'prompt.importTemplate': 'Vorlage-JSON einfügen:'
+                },
+                en: {
+                    // Sidebar
+                    'sidebar.projects': 'Projects',
+                    'sidebar.new': '+ New',
+                    'sidebar.duplicate': 'Duplicate',
+                    'sidebar.saveAsTemplate': 'Save as Template',
+                    'sidebar.delete': 'Delete',
+                    'sidebar.templates': 'Templates',
+                    'sidebar.manage': 'Manage',
+                    'sidebar.noProjects': 'No projects available',
+                    'sidebar.noTemplates': 'No templates saved',
+                    'sidebar.newFromTemplate': '+ New Project (Template)',
+                    // Toolbar
+                    'toolbar.project': 'Project',
+                    'toolbar.groups': 'Groups',
+                    'toolbar.elements': 'Phases & Milestones',
+                    'toolbar.timeScale': 'Time Scale:',
+                    'toolbar.months': 'Months',
+                    'toolbar.quarters': 'Quarters',
+                    'toolbar.export': 'Export',
+                    'toolbar.json': 'JSON',
+                    'toolbar.darkTheme': 'Dark Theme',
+                    'toolbar.lightTheme': 'Light Theme',
+                    'toolbar.verticalRoadmap': 'Vertical Roadmap',
+                    'toolbar.execSummary': 'Executive Summary',
+                    // Editor - Projekt
+                    'project.settings': 'Project Settings',
+                    'project.name': 'Project Name',
+                    'project.description': 'Description',
+                    'project.start': 'Project Start',
+                    'project.end': 'Project End',
+                    'project.showToday': 'Show Today Line',
+                    'project.showLegend': 'Show Legend',
+                    'project.colorCategories': 'Color Categories',
+                    'project.colorGreen': 'Name for Green',
+                    'project.colorRed': 'Name for Red',
+                    'project.colorDarkRed': 'Name for Dark Red',
+                    'project.colorInfo': 'These names appear in the legend.',
+                    'project.noSelected': 'No project selected',
+                    'project.createNew': '+ Create New Project',
+                    // Editor - Gruppen
+                    'groups.title': 'Groups',
+                    'groups.add': '+ Group',
+                    'groups.info': 'Groups are headers that organize phases and milestones.',
+                    'groups.placeholder': 'Group name',
+                    'groups.none': 'No groups available',
+                    // Editor - Elemente
+                    'elements.title': 'Elements',
+                    'elements.list': 'List',
+                    'elements.table': 'Table',
+                    'elements.addPhase': '+ Phase',
+                    'elements.addMilestone': '+ MS',
+                    'elements.addMultiple': '+ Multiple',
+                    'elements.name': 'Name',
+                    'elements.group': 'Group',
+                    'elements.noGroup': '-- None --',
+                    'elements.start': 'Start',
+                    'elements.end': 'End',
+                    'elements.date': 'Date',
+                    'elements.level': 'Indentation',
+                    'elements.level1': 'Level 1',
+                    'elements.level2': 'Level 2',
+                    'elements.level3': 'Level 3',
+                    'elements.critical': 'Critical',
+                    'elements.buffer': 'Buffer:',
+                    'elements.color': 'Color:',
+                    'elements.duplicate': 'Duplicate',
+                    'elements.delete': 'Delete',
+                    'elements.none': 'No elements',
+                    'elements.withoutGroup': 'Without Group',
+                    'elements.type': 'Type',
+                    'elements.phase': 'Phase',
+                    'elements.milestone': 'MS',
+                    'elements.actions': 'Actions',
+                    'elements.drag': 'Drag',
+                    'elements.unnamed': '(Unnamed)',
+                    'elements.noneExist': 'No phases or milestones.',
+                    'elements.createGroupsFirst': 'Create groups first, then add elements.',
+                    // Timeline
+                    'timeline.theme': 'Theme',
+                    'timeline.today': 'Today',
+                    'timeline.buffer': 'Time Buffer',
+                    'timeline.milestone': 'Milestone',
+                    'timeline.criticalPath': 'Critical Path',
+                    // Modals - Export
+                    'export.title': 'Export Timeline',
+                    'export.format': 'Format',
+                    'export.scale': 'Scale',
+                    'export.scale1x': '1x (Standard)',
+                    'export.scale2x': '2x (High Resolution)',
+                    'export.scale3x': '3x (Very High Resolution)',
+                    'export.export': 'Export',
+                    // Modals - Import/Export
+                    'import.title': 'Import/Export',
+                    'import.csvTitle': 'CSV Import (from Excel)',
+                    'import.csvInfo': 'Import project data from a CSV file. Create the file in Excel and save as CSV (semicolon-separated).',
+                    'import.selectFile': 'Select CSV File',
+                    'import.downloadTemplate': 'Download Template',
+                    'import.jsonTitle': 'JSON Import/Export',
+                    'import.projectJson': 'Project JSON',
+                    'import.copy': 'Copy',
+                    'import.importJson': 'Import JSON',
+                    // Modals - Vorlagen
+                    'templates.title': 'Manage Templates',
+                    'templates.noneExist': 'No templates saved.',
+                    'templates.saveHint': 'Save a project as template via "Save as Template".',
+                    'templates.groups': 'Groups',
+                    'templates.elements': 'Elements',
+                    'templates.created': 'Created',
+                    'templates.use': 'Use',
+                    'templates.import': 'Import Template',
+                    // Modals - Vorlage speichern
+                    'saveTemplate.title': 'Save as Template',
+                    'saveTemplate.name': 'Template Name',
+                    'saveTemplate.placeholder': 'e.g. Standard Transition',
+                    'saveTemplate.info': 'The template contains all groups and elements of the current project. When creating a new project, dates are adjusted relative to the new start date.',
+                    // Modals - Batch
+                    'batch.title': 'Add Multiple Elements',
+                    'batch.targetGroup': 'Target Group',
+                    'batch.noGroup': '-- No Group --',
+                    'batch.elements': 'Elements (one line per element)',
+                    'batch.formatLabel': 'Format',
+                    'batch.phaseFormat': 'Phase',
+                    'batch.milestoneFormat': 'Milestone',
+                    'batch.colorsLabel': 'Colors',
+                    'batch.dateLabel': 'Date',
+                    'batch.or': 'or',
+                    'batch.criticalLabel': 'Critical',
+                    'batch.criticalHint': 'ja or leave empty',
+                    // Common
+                    'common.cancel': 'Cancel',
+                    'common.save': 'Save',
+                    'common.close': 'Close',
+                    'common.add': 'Add',
+                    'common.delete': 'Delete',
+                    'common.export': 'Export',
+                    'common.days': 'days',
+                    // Defaults
+                    'default.newProject': 'New Project',
+                    'default.newGroup': 'New Group',
+                    'default.newPhase': 'New Phase',
+                    'default.newMilestone': 'New Milestone',
+                    'default.preparation': 'Preparation',
+                    'default.planDuration': 'Plan Duration',
+                    'default.critical': 'Critical',
+                    'default.phaseplan': 'Phase Plan',
+                    'default.csvImport': 'CSV Import',
+                    'default.fromTemplate': 'New Project (from {name})',
+                    'default.copy': '(Copy)',
+                    // Alerts & Confirms
+                    'confirm.deleteProject': 'Delete project "{name}"?',
+                    'confirm.deleteGroup': 'Delete group "{name}"? Elements will not be deleted.',
+                    'confirm.deleteTemplate': 'Delete template "{name}"?',
+                    'alert.templateSaved': 'Template "{name}" saved!',
+                    'alert.templateImported': 'Template "{name}" imported!',
+                    'alert.jsonCopied': 'JSON copied to clipboard',
+                    'alert.templateJsonCopied': 'Template JSON copied to clipboard',
+                    'alert.importSuccess': 'Project imported successfully',
+                    'alert.csvSuccess': 'CSV import successful! {groups} group(s), {elements} element(s) created.',
+                    'alert.elementsAdded': '{count} element(s) added.',
+                    'error.invalidFormat': 'Invalid project format',
+                    'error.invalidTemplateFormat': 'Invalid template format',
+                    'error.importFailed': 'Import failed:',
+                    'error.copyFailed': 'Copy failed:',
+                    'error.exportFailed': 'Export failed:',
+                    'error.csvMinRows': 'CSV must contain at least a header row and one data row',
+                    'error.csvMissingColumn': 'CSV missing required column:',
+                    'error.invalidDate': 'Line {line}: Invalid date for {type} "{name}"',
+                    'error.unknownType': 'Line {line}: Unknown type "{type}"',
+                    'error.errors': 'Errors:',
+                    'prompt.importTemplate': 'Paste template JSON:'
+                }
+            };
+
+            const locale = ref('de');
+
+            function t(key, params = {}) {
+                let text = translations[locale.value][key] || key;
+                Object.keys(params).forEach(k => {
+                    text = text.replace(`{${k}}`, params[k]);
+                });
+                return text;
+            }
+
+            const monthNames = computed(() =>
+                locale.value === 'de'
+                    ? ['JAN', 'FEB', 'MÄR', 'APR', 'MAI', 'JUN', 'JUL', 'AUG', 'SEP', 'OKT', 'NOV', 'DEZ']
+                    : ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC']
+            );
 
             // Theme-Farben (Hell/Dunkel)
             const themeColors = computed(() => ({
@@ -1380,8 +1747,6 @@ meilenstein;Kickoff;2025-01-15"></textarea>
                 const { start, end } = projectDuration.value;
                 const scale = currentProject.value.einstellungen.zeitskala;
 
-                const monthNames = ['JAN', 'FEB', 'MÄR', 'APR', 'MAI', 'JUN', 'JUL', 'AUG', 'SEP', 'OKT', 'NOV', 'DEZ'];
-
                 let current = new Date(start.getFullYear(), start.getMonth(), 1);
 
                 while (current <= end) {
@@ -1393,7 +1758,7 @@ meilenstein;Kickoff;2025-01-15"></textarea>
                         nextDate = new Date(current);
                         nextDate.setMonth(nextDate.getMonth() + 3);
                     } else {
-                        label = monthNames[current.getMonth()];
+                        label = monthNames.value[current.getMonth()];
                         nextDate = new Date(current);
                         nextDate.setMonth(nextDate.getMonth() + 1);
                     }
@@ -1428,7 +1793,6 @@ meilenstein;Kickoff;2025-01-15"></textarea>
                 const periods = [];
                 const { start, end } = projectDuration.value;
                 const scale = currentProject.value.einstellungen.zeitskala;
-                const monthNames = ['JAN', 'FEB', 'MÄR', 'APR', 'MAI', 'JUN', 'JUL', 'AUG', 'SEP', 'OKT', 'NOV', 'DEZ'];
                 let current = new Date(start.getFullYear(), start.getMonth(), 1);
 
                 while (current <= end) {
@@ -1439,7 +1803,7 @@ meilenstein;Kickoff;2025-01-15"></textarea>
                         nextDate = new Date(current);
                         nextDate.setMonth(nextDate.getMonth() + 3);
                     } else {
-                        label = `${monthNames[current.getMonth()]} ${current.getFullYear()}`;
+                        label = `${monthNames.value[current.getMonth()]} ${current.getFullYear()}`;
                         nextDate = new Date(current);
                         nextDate.setMonth(nextDate.getMonth() + 1);
                     }
@@ -1554,13 +1918,13 @@ meilenstein;Kickoff;2025-01-15"></textarea>
                 const newProject = {
                     id: generateId(),
                     projekt: {
-                        name: 'Neues Projekt',
+                        name: t('default.newProject'),
                         beschreibung: '',
                         start: startDate.toISOString().split('T')[0],
                         ende: endDate.toISOString().split('T')[0]
                     },
                     gruppen: [
-                        { id: generateId(), name: 'Phasenplan', reihenfolge: 1 }
+                        { id: generateId(), name: t('default.phaseplan'), reihenfolge: 1 }
                     ],
                     elemente: [],
                     einstellungen: {
@@ -1568,9 +1932,9 @@ meilenstein;Kickoff;2025-01-15"></textarea>
                         legendeAnzeigen: true,
                         zeitskala: 'monat',
                         farbNamen: {
-                            gruen: 'Vorbereitung',
-                            rot: 'Plandauer',
-                            dunkelrot: 'Kritisch'
+                            gruen: t('default.preparation'),
+                            rot: t('default.planDuration'),
+                            dunkelrot: t('default.critical')
                         }
                     }
                 };
@@ -1588,7 +1952,7 @@ meilenstein;Kickoff;2025-01-15"></textarea>
                 if (!currentProject.value) return;
                 const copy = JSON.parse(JSON.stringify(currentProject.value));
                 copy.id = generateId();
-                copy.projekt.name = copy.projekt.name + ' (Kopie)';
+                copy.projekt.name = copy.projekt.name + ' ' + t('default.copy');
 
                 // Generate new IDs
                 const idMap = {};
@@ -1609,7 +1973,7 @@ meilenstein;Kickoff;2025-01-15"></textarea>
 
             function deleteProject() {
                 if (!currentProject.value) return;
-                if (!confirm(`Projekt "${currentProject.value.projekt.name}" wirklich löschen?`)) return;
+                if (!confirm(t('confirm.deleteProject', { name: currentProject.value.projekt.name }))) return;
                 const index = projects.value.findIndex(p => p.id === currentProjectId.value);
                 if (index >= 0) {
                     projects.value.splice(index, 1);
@@ -1656,7 +2020,7 @@ meilenstein;Kickoff;2025-01-15"></textarea>
                 saveTemplatesToStorage();
                 showSaveTemplateModal.value = false;
                 newTemplateName.value = '';
-                alert('Vorlage "' + template.name + '" gespeichert!');
+                alert(t('alert.templateSaved', { name: template.name }));
             }
 
             function createFromTemplate(template) {
@@ -1694,7 +2058,7 @@ meilenstein;Kickoff;2025-01-15"></textarea>
                 const newProject = {
                     id: generateId(),
                     projekt: {
-                        name: 'Neues Projekt (aus ' + template.name + ')',
+                        name: t('default.fromTemplate', { name: template.name }),
                         beschreibung: '',
                         start: startDate.toISOString().split('T')[0],
                         ende: endDate.toISOString().split('T')[0]
@@ -1715,7 +2079,7 @@ meilenstein;Kickoff;2025-01-15"></textarea>
 
             function deleteTemplate(id) {
                 const template = templates.value.find(t => t.id === id);
-                if (!confirm(`Vorlage "${template?.name}" wirklich löschen?`)) return;
+                if (!confirm(t('confirm.deleteTemplate', { name: template?.name }))) return;
                 const index = templates.value.findIndex(t => t.id === id);
                 if (index >= 0) {
                     templates.value.splice(index, 1);
@@ -1726,25 +2090,25 @@ meilenstein;Kickoff;2025-01-15"></textarea>
             function exportTemplateAsJson(template) {
                 const json = JSON.stringify(template, null, 2);
                 navigator.clipboard.writeText(json)
-                    .then(() => alert('Vorlage-JSON in Zwischenablage kopiert'))
-                    .catch(e => alert('Kopieren fehlgeschlagen: ' + e.message));
+                    .then(() => alert(t('alert.templateJsonCopied')))
+                    .catch(e => alert(t('error.copyFailed') + ' ' + e.message));
             }
 
             function importTemplateFromJson() {
-                const jsonStr = prompt('Vorlage-JSON einfügen:');
+                const jsonStr = prompt(t('prompt.importTemplate'));
                 if (!jsonStr) return;
                 try {
                     const imported = JSON.parse(jsonStr);
                     if (!imported.name || !imported.gruppen) {
-                        throw new Error('Ungültiges Vorlagenformat');
+                        throw new Error(t('error.invalidTemplateFormat'));
                     }
                     imported.id = generateId();
                     imported.erstelltAm = new Date().toISOString().split('T')[0];
                     templates.value.push(imported);
                     saveTemplatesToStorage();
-                    alert('Vorlage "' + imported.name + '" importiert!');
+                    alert(t('alert.templateImported', { name: imported.name }));
                 } catch (e) {
-                    alert('Import fehlgeschlagen: ' + e.message);
+                    alert(t('error.importFailed') + ' ' + e.message);
                 }
             }
 
@@ -1780,7 +2144,7 @@ meilenstein;Kickoff;2025-01-15"></textarea>
                 const nextOrder = Math.max(0, ...currentProject.value.gruppen.map(g => g.reihenfolge)) + 1;
                 currentProject.value.gruppen.push({
                     id: generateId(),
-                    name: 'Neue Gruppe',
+                    name: t('default.newGroup'),
                     reihenfolge: nextOrder
                 });
                 saveToStorage();
@@ -1804,7 +2168,7 @@ meilenstein;Kickoff;2025-01-15"></textarea>
             function deleteGruppe(id) {
                 if (!currentProject.value) return;
                 const gruppe = currentProject.value.gruppen.find(g => g.id === id);
-                if (!confirm(`Gruppe "${gruppe?.name}" wirklich löschen? Elemente werden nicht gelöscht.`)) return;
+                if (!confirm(t('confirm.deleteGroup', { name: gruppe?.name }))) return;
                 const index = currentProject.value.gruppen.findIndex(g => g.id === id);
                 if (index >= 0) {
                     currentProject.value.gruppen.splice(index, 1);
@@ -1826,7 +2190,7 @@ meilenstein;Kickoff;2025-01-15"></textarea>
                     currentProject.value.elemente.push({
                         id: generateId(),
                         typ: 'phase',
-                        name: 'Neue Phase',
+                        name: t('default.newPhase'),
                         gruppe: defaultGruppe,
                         einrueckung: 0,
                         start: today.toISOString().split('T')[0],
@@ -1840,7 +2204,7 @@ meilenstein;Kickoff;2025-01-15"></textarea>
                     currentProject.value.elemente.push({
                         id: generateId(),
                         typ: 'meilenstein',
-                        name: 'Neuer Meilenstein',
+                        name: t('default.newMilestone'),
                         gruppe: defaultGruppe,
                         einrueckung: 0,
                         datum: today.toISOString().split('T')[0],
@@ -1931,7 +2295,7 @@ meilenstein;Kickoff;2025-01-15"></textarea>
                 if (!currentProject.value) return;
                 const copy = JSON.parse(JSON.stringify(element));
                 copy.id = generateId();
-                copy.name = element.name + ' (Kopie)';
+                copy.name = element.name + ' ' + t('default.copy');
                 copy.reihenfolge = Math.max(0, ...currentProject.value.elemente.map(e => e.reihenfolge)) + 1;
                 currentProject.value.elemente.push(copy);
                 saveToStorage();
@@ -1975,7 +2339,7 @@ meilenstein;Kickoff;2025-01-15"></textarea>
 
                     if (typ === 'phase') {
                         // phase;Name;Start;Ende;Farbe;Puffer;Kritisch
-                        const name = parts[1] || 'Neue Phase';
+                        const name = parts[1] || t('default.newPhase');
                         const start = parseDate(parts[2]);
                         const ende = parseDate(parts[3]);
                         const farbe = ['gruen', 'rot', 'dunkelrot'].includes(parts[4]) ? parts[4] : 'rot';
@@ -1983,7 +2347,7 @@ meilenstein;Kickoff;2025-01-15"></textarea>
                         const kritisch = parts[6]?.toLowerCase() === 'ja';
 
                         if (!start || !ende) {
-                            errors.push(`Zeile ${i + 1}: Ungültiges Datum für Phase "${name}"`);
+                            errors.push(t('error.invalidDate', { line: i + 1, type: t('elements.phase'), name: name }));
                             continue;
                         }
 
@@ -2004,11 +2368,11 @@ meilenstein;Kickoff;2025-01-15"></textarea>
                         addedCount++;
                     } else if (typ === 'meilenstein' || typ === 'ms') {
                         // meilenstein;Name;Datum
-                        const name = parts[1] || 'Neuer Meilenstein';
+                        const name = parts[1] || t('default.newMilestone');
                         const datum = parseDate(parts[2]);
 
                         if (!datum) {
-                            errors.push(`Zeile ${i + 1}: Ungültiges Datum für Meilenstein "${name}"`);
+                            errors.push(t('error.invalidDate', { line: i + 1, type: t('timeline.milestone'), name: name }));
                             continue;
                         }
 
@@ -2031,9 +2395,9 @@ meilenstein;Kickoff;2025-01-15"></textarea>
                 saveToStorage();
                 showBatchInputModal.value = false;
 
-                let message = `${addedCount} Element(e) hinzugefügt.`;
+                let message = t('alert.elementsAdded', { count: addedCount });
                 if (errors.length > 0) {
-                    message += '\n\nFehler:\n' + errors.join('\n');
+                    message += '\n\n' + t('error.errors') + '\n' + errors.join('\n');
                 }
                 alert(message);
             }
@@ -2182,7 +2546,7 @@ meilenstein;Kickoff;2025-01-15"></textarea>
                     document.body.removeChild(link);
                 } catch (e) {
                     console.error('Export error:', e);
-                    alert('Export fehlgeschlagen: ' + e.message);
+                    alert(t('error.exportFailed') + ' ' + e.message);
                 }
             }
 
@@ -2190,8 +2554,8 @@ meilenstein;Kickoff;2025-01-15"></textarea>
                 if (!currentProject.value) return;
                 const json = JSON.stringify(currentProject.value, null, 2);
                 navigator.clipboard.writeText(json)
-                    .then(() => alert('JSON in Zwischenablage kopiert'))
-                    .catch(e => alert('Kopieren fehlgeschlagen: ' + e.message));
+                    .then(() => alert(t('alert.jsonCopied')))
+                    .catch(e => alert(t('error.copyFailed') + ' ' + e.message));
             }
 
             function importFromJson() {
@@ -2200,16 +2564,16 @@ meilenstein;Kickoff;2025-01-15"></textarea>
                 try {
                     const imported = JSON.parse(jsonDataInput.value);
                     if (!imported.projekt || !imported.gruppen) {
-                        throw new Error('Ungültiges Projektformat');
+                        throw new Error(t('error.invalidFormat'));
                     }
                     imported.id = generateId();
                     projects.value.push(imported);
                     currentProjectId.value = imported.id;
                     saveToStorage();
                     showImportExportModal.value = false;
-                    alert('Projekt erfolgreich importiert');
+                    alert(t('alert.importSuccess'));
                 } catch (e) {
-                    alert('Import fehlgeschlagen: ' + e.message);
+                    alert(t('error.importFailed') + ' ' + e.message);
                 }
             }
 
@@ -2235,7 +2599,7 @@ meilenstein;Kickoff;2025-01-15"></textarea>
 
                 const lines = csvContent.trim().split('\n');
                 if (lines.length < 2) {
-                    alert('CSV muss mindestens eine Kopfzeile und eine Datenzeile enthalten');
+                    alert(t('error.csvMinRows'));
                     return;
                 }
 
@@ -2244,7 +2608,7 @@ meilenstein;Kickoff;2025-01-15"></textarea>
                 const requiredCols = ['typ', 'name'];
                 for (const col of requiredCols) {
                     if (!header.includes(col)) {
-                        alert(`CSV fehlt erforderliche Spalte: ${col}`);
+                        alert(t('error.csvMissingColumn') + ' ' + col);
                         return;
                     }
                 }
@@ -2258,7 +2622,7 @@ meilenstein;Kickoff;2025-01-15"></textarea>
                 const newProject = {
                     id: generateId(),
                     projekt: {
-                        name: 'CSV Import',
+                        name: t('default.csvImport'),
                         beschreibung: '',
                         start: '',
                         ende: ''
@@ -2270,9 +2634,9 @@ meilenstein;Kickoff;2025-01-15"></textarea>
                         legendeAnzeigen: true,
                         zeitskala: 'monat',
                         farbNamen: {
-                            gruen: 'Vorbereitung',
-                            rot: 'Plandauer',
-                            dunkelrot: 'Kritisch'
+                            gruen: t('default.preparation'),
+                            rot: t('default.planDuration'),
+                            dunkelrot: t('default.critical')
                         }
                     }
                 };
@@ -2324,7 +2688,7 @@ meilenstein;Kickoff;2025-01-15"></textarea>
                         const ende = parseDate(endeStr);
 
                         if (!start || !ende) {
-                            errors.push(`Zeile ${i + 1}: Ungültiges Datum für Phase "${name}"`);
+                            errors.push(t('error.invalidDate', { line: i + 1, type: t('elements.phase'), name: name }));
                             continue;
                         }
 
@@ -2359,7 +2723,7 @@ meilenstein;Kickoff;2025-01-15"></textarea>
                         const datum = parseDate(datumStr);
 
                         if (!datum) {
-                            errors.push(`Zeile ${i + 1}: Ungültiges Datum für Meilenstein "${name}"`);
+                            errors.push(t('error.invalidDate', { line: i + 1, type: t('timeline.milestone'), name: name }));
                             continue;
                         }
 
@@ -2400,11 +2764,11 @@ meilenstein;Kickoff;2025-01-15"></textarea>
                 saveToStorage();
                 showImportExportModal.value = false;
 
-                let message = `CSV-Import erfolgreich!\n${newProject.gruppen.length} Gruppe(n), ${newProject.elemente.length} Element(e) erstellt.`;
+                let message = t('alert.csvSuccess', { groups: newProject.gruppen.length, elements: newProject.elemente.length });
                 if (errors.length > 0) {
-                    message += '\n\nWarnungen:\n' + errors.slice(0, 5).join('\n');
+                    message += '\n\n' + t('error.errors') + '\n' + errors.slice(0, 5).join('\n');
                     if (errors.length > 5) {
-                        message += `\n... und ${errors.length - 5} weitere`;
+                        message += '\n... +' + (errors.length - 5);
                     }
                 }
                 alert(message);
@@ -2524,7 +2888,10 @@ phase;Stream A;Workstreams;2025-01-01;2025-03-31;gruen;0;nein;0`;
                 importFromJson,
                 handleCsvFileSelect,
                 downloadCsvTemplate,
-                saveToStorage
+                saveToStorage,
+                locale,
+                t,
+                monthNames
             };
         }
     }).mount('#app');

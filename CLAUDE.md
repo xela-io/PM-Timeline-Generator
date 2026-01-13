@@ -326,6 +326,37 @@ Alle drei Ansichten sind kombinierbar (z.B. vertikale Roadmap im Dark Mode mit E
 - SVG (verlustfrei)
 - JSON (Projekt-Daten)
 
+### Internationalisierung (i18n)
+Zweisprachige Unterstützung mit Sprachumschalter:
+
+**Sprachumschalter**
+- Button im Header (neben "Timeline Generator")
+- Zeigt "EN" wenn Deutsch aktiv, "DE" wenn Englisch aktiv
+- Sofortiger Wechsel aller UI-Texte
+
+**Implementierung**
+```javascript
+const translations = {
+    de: { 'sidebar.projects': 'Projekte', ... },
+    en: { 'sidebar.projects': 'Projects', ... }
+};
+const locale = ref('de');
+function t(key, params = {}) { ... }
+```
+
+**Übersetzte Bereiche**
+- Sidebar (Projekte, Vorlagen, Aktionen)
+- Toolbar (Tabs, Zeitskala, Theme-Buttons)
+- Editor (alle 3 Tabs mit Formularen)
+- Timeline-Legende
+- Alle Modals (Export, Import, Vorlagen, Batch)
+- Alerts und Confirms
+- Default-Namen (Neues Projekt, Neue Phase, etc.)
+- Monatsnamen in Timeline (MÄR ↔ MAR)
+
+**~160 Übersetzungsschlüssel** in 13 Kategorien:
+`sidebar.*`, `toolbar.*`, `project.*`, `groups.*`, `elements.*`, `timeline.*`, `export.*`, `import.*`, `templates.*`, `saveTemplate.*`, `batch.*`, `common.*`, `default.*`, `confirm.*`, `alert.*`, `error.*`
+
 ## CSS-Klassen
 
 ### Timeline
@@ -410,6 +441,17 @@ open index.html
 34. [ ] Panel-Breite per Resize-Handle anpassen
 35. [ ] Browser schließen/öffnen → Persistenz prüfen
 
+### Internationalisierung
+36. [ ] Sprachumschalter: DE ↔ EN wechseln
+37. [ ] Sidebar-Texte wechseln (Projekte ↔ Projects)
+38. [ ] Toolbar-Texte wechseln
+39. [ ] Editor-Texte wechseln (alle Tabs)
+40. [ ] Modal-Texte wechseln
+41. [ ] Timeline-Legende wechseln
+42. [ ] Monatsnamen wechseln (MÄR ↔ MAR)
+43. [ ] Fehlermeldungen auf Englisch prüfen
+44. [ ] Bestätigungsdialoge auf Englisch prüfen
+
 ## Bekannte Einschränkungen
 
 - Keine Abhängigkeiten zwischen Phasen (Gantt-Verbindungen)
@@ -419,4 +461,4 @@ open index.html
 
 ## Sprache
 
-UI komplett auf Deutsch.
+UI zweisprachig (Deutsch/Englisch) mit Sprachumschalter im Header.
