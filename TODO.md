@@ -37,34 +37,77 @@
 - [x] LICENSE - MIT Lizenz
 - [x] .gitignore - Standard-Ignores
 - [x] docs/README.md - Screenshot-Anleitung
+- [x] TODO.md - Diese Datei
 
-### Repository Setup
-- [x] Git Repository initialisiert
-- [x] Branch auf 'main' umbenannt
-- [x] Alle Dateien gestaged
+### GitHub Veröffentlichung
+- [x] Git Repository initialisiert (`git init`)
+- [x] Branch auf 'main' umbenannt (`git branch -m main`)
+- [x] Git User konfiguriert (`git config --global user.name/email`)
+- [x] SSH-Key erstellt (`ssh-keygen -t ed25519`)
+- [x] SSH-Key bei GitHub hinterlegt
+- [x] Initial Commit erstellt
+- [x] GitHub Repository erstellt (PM-Timeline-Generator)
+- [x] Remote hinzugefügt (`git remote add origin ...`)
+- [x] Code gepusht (`git push -u origin main`)
+- [x] GitHub Pages aktiviert
+- [x] Screenshots hochgeladen (docs/)
+
+### Optional: Repository Verbesserungen
+- [ ] GitHub Topics hinzufügen
+- [ ] GitHub Description setzen
+- [ ] Release v1.0.0 erstellen
 
 ---
 
-## Offen
+## Links
 
-### GitHub Veröffentlichung
-- [ ] Git User konfigurieren (`git config --global user.name/email`)
-- [ ] Initial Commit erstellen
-- [ ] GitHub Repository erstellen
-- [ ] Remote hinzufügen (`git remote add origin ...`)
-- [ ] Code pushen (`git push -u origin main`)
+| Ressource | URL |
+|-----------|-----|
+| **Repository** | https://github.com/xela-io/PM-Timeline-Generator |
+| **Live-App** | https://xela-io.github.io/PM-Timeline-Generator/ |
+| **GitHub Profile** | https://github.com/xela-io |
 
-### Screenshots für README
-- [ ] preview.png erstellen (Hauptbild, 1200x630px empfohlen)
-- [ ] screenshot-main.png (Vollansicht der App)
-- [ ] screenshot-timeline.png (Timeline-Detail)
-- [ ] screenshot-export.png (Export-Dialog)
+---
 
-### Optional: Repository Verbesserungen
-- [ ] GitHub Topics hinzufügen (vue, timeline, gantt, project-management)
-- [ ] GitHub Description setzen
-- [ ] GitHub Pages aktivieren (index.html als Demo)
-- [ ] Release v1.0.0 erstellen
+## Git Konfiguration (für neue Geräte)
+
+### 1. Git User setzen
+```bash
+git config --global user.name "xela-io"
+git config --global user.email "anor.londoe@pm.me"
+```
+
+### 2. SSH-Key erstellen
+```bash
+ssh-keygen -t ed25519 -C "anor.londoe@pm.me"
+# Enter drücken für Standard-Pfad
+# Optional: Passphrase setzen
+```
+
+### 3. SSH-Key anzeigen und bei GitHub hinzufügen
+```bash
+cat ~/.ssh/id_ed25519.pub
+# Output kopieren und bei GitHub hinzufügen:
+# https://github.com/settings/ssh/new
+```
+
+### 4. SSH-Agent starten (bei jeder Session oder in .bashrc)
+```bash
+eval "$(ssh-agent -s)"
+ssh-add ~/.ssh/id_ed25519
+```
+
+### 5. Verbindung testen
+```bash
+ssh -T git@github.com
+# Erwartete Ausgabe: "Hi xela-io! You've successfully authenticated..."
+```
+
+### SSH dauerhaft aktivieren (optional)
+Füge zu `~/.bashrc` hinzu:
+```bash
+echo 'eval "$(ssh-agent -s)" > /dev/null && ssh-add ~/.ssh/id_ed25519 2>/dev/null' >> ~/.bashrc
+```
 
 ---
 
@@ -117,28 +160,47 @@ Vorlage
 - html2canvas für PNG-Export
 - Native HTML5 Drag & Drop
 
----
-
-## Commit-Nachricht (vorbereitet)
-
+### Dateistruktur
 ```
-Initial release: Timeline Generator v1.0
-
-A browser-based timeline generator for project management and transition planning.
-
-Features:
-- Single HTML file, no backend required
-- Vue 3 + Tailwind CSS via CDN
-- SVG-based Gantt chart visualization
-- Hierarchical groups with phases and milestones
-- Drag & drop reordering
-- Templates with relative dates
-- Export to PNG, SVG, JSON
-- LocalStorage persistence
-- Customizable color categories
-- German UI
+PM-Timeline-Generator/
+├── index.html              # Haupt-App (Single-File, ~1600 Zeilen)
+├── README.md               # GitHub-Projektbeschreibung
+├── CLAUDE.md               # Technische Entwickler-Dokumentation
+├── CONTRIBUTING.md         # Beitragsrichtlinien
+├── LICENSE                 # MIT Lizenz
+├── TODO.md                 # Diese Datei
+├── .gitignore              # Git-Ignores
+└── docs/
+    ├── README.md           # Screenshot-Anleitung
+    ├── screenshot-main.png
+    ├── screenshot-timeline.png
+    └── screenshot-export.png
 ```
 
 ---
 
-*Letzte Aktualisierung: Januar 2025*
+## Commits
+
+| Datum | Nachricht |
+|-------|-----------|
+| 2025-01-13 | Initial release: Timeline Generator v1.0 |
+| 2025-01-13 | Add screenshots for README |
+| 2025-01-13 | Update README with correct repo URL and screenshot |
+
+---
+
+## Empfohlene Topics für GitHub
+```
+vue, tailwindcss, timeline, gantt-chart, project-management,
+svg, single-page-app, no-backend, offline-first
+```
+
+## Empfohlene Description für GitHub
+```
+Browser-based timeline generator for project management.
+Single HTML file, no backend required. Vue 3 + Tailwind CSS.
+```
+
+---
+
+*Letzte Aktualisierung: 13. Januar 2025*
