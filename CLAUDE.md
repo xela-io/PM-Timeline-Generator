@@ -19,8 +19,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```
 /projektmanagement/
-├── index.html                      # Haupt-App (Single-File, ~1600 Zeilen)
+├── index.html                      # Haupt-App (Single-File, ~2500 Zeilen)
 ├── CLAUDE.md                       # Diese Dokumentation
+├── beispiel-import.csv             # Beispiel-CSV für Import
 └── timeline-generator-requirements.md  # Ursprüngliche Requirements
 ```
 
@@ -30,7 +31,7 @@ Alles in einer einzigen HTML-Datei (`index.html`):
 
 ```
 index.html
-├── <style> - CSS inkl. Drag&Drop, Timeline-Styling
+├── <style> - CSS inkl. Drag&Drop, Timeline-Styling, Resize-Handle
 ├── <div id="app"> - Vue Template
 │   ├── Sidebar
 │   │   ├── Projektliste
@@ -38,10 +39,11 @@ index.html
 │   │   └── Vorlagen-Liste
 │   ├── Main Content
 │   │   ├── Toolbar (Tab-Auswahl, Zeitskala, Export-Buttons)
-│   │   ├── Editor Panel (3 Tabs)
+│   │   ├── Editor Panel (3 Tabs, verstellbare Breite)
 │   │   │   ├── Projekt (Name, Datum, Einstellungen, Farb-Kategorien)
 │   │   │   ├── Gruppen (CRUD, Sortierung)
-│   │   │   └── Phasen & Meilensteine (CRUD, Drag&Drop)
+│   │   │   └── Phasen & Meilensteine (2 Ansichten: Liste/Tabelle)
+│   │   ├── Resize Handle (Panel-Breite anpassen)
 │   │   └── Timeline Canvas (SVG)
 │   │       ├── Legende (dynamisch)
 │   │       ├── Zeitachse (Jahr + Monate)
@@ -51,7 +53,8 @@ index.html
 │   │       └── Heute-Linie
 │   └── Modals
 │       ├── Export (PNG/SVG)
-│       ├── JSON Import/Export
+│       ├── Import/Export (JSON + CSV)
+│       ├── Batch-Eingabe (Mehrere Elemente)
 │       ├── Vorlagen verwalten
 │       └── Vorlage speichern
 └── <script> - Vue 3 App
@@ -149,7 +152,16 @@ index.html
 - `templates` - Array aller Vorlagen
 - `currentProjectId` - ID des aktiven Projekts
 - `activeTab` - Aktiver Editor-Tab ('projekt', 'gruppen', 'elemente')
+- `elementeView` - Ansichtsmodus ('kompakt' oder 'tabelle')
+- `expandedElementId` - ID des aufgeklappten Elements (kompakte Ansicht)
+- `collapsedGroups` - Set der eingeklappten Gruppen
+- `editorPanelWidth` - Breite des Editor-Panels (280-600px)
+- `isResizing` - Resize-Modus aktiv
 - `draggedElement`, `dragOverId` - Drag & Drop State
+- `showBatchInputModal`, `batchInputText`, `batchInputGruppe` - Batch-Eingabe State
+- `darkMode` - Dunkles Theme aktiv
+- `showExecutiveSummary` - Executive Summary Filter aktiv
+- `verticalMode` - Vertikale Roadmap-Ansicht aktiv
 
 ### Wichtige Computed Properties
 - `currentProject` - Das aktive Projekt-Objekt
@@ -157,8 +169,12 @@ index.html
 - `usedColors` - Nur verwendete Farben für die Legende
 - `hasBuffer` / `hasMilestones` / `hasCritical` - Flags für Legende
 - `timelineRows` - Berechnete Zeilen für SVG (Gruppen + Elemente)
+- `displayRows` - Gefilterte Zeilen (für Executive Summary)
 - `yearPeriods` / `timePeriods` - Zeitachsen-Daten
 - `canvasWidth` / `canvasHeight` - SVG-Dimensionen
+- `themeColors` - Dynamische Farbpalette (Hell/Dunkel)
+- `verticalTimePeriods` / `verticalElements` - Daten für vertikale Roadmap
+- `verticalCanvasHeight` - Höhe der vertikalen Timeline
 - `todayX` - X-Position der Heute-Linie
 
 ### Farben
@@ -213,11 +229,81 @@ const labelX = Math.max(labelWidth + 30, x + width / 2);
 - Puffer/Zeitreserve (gestrichelte Linie)
 - Farb-Kategorie (Grün, Rot, Dunkelrot)
 - Einrückung (3 Ebenen)
+- **Duplizieren** - Element mit einem Klick kopieren
 
 ### Meilensteine
 - Datum
 - Hohle Rauten-Darstellung
 - Einrückung (3 Ebenen)
+- **Duplizieren** - Element mit einem Klick kopieren
+
+### Elemente-Ansichten
+Zwei umschaltbare Ansichtsmodi im Elemente-Tab:
+
+**Kompakte Listenansicht** (Standard)
+- Elemente als Einzeiler mit Name, Farbe, Datum
+- Klick auf Element klappt Details auf
+- Gruppen ein-/ausklappbar (zeigt Elementanzahl)
+- Platzsparend bei vielen Elementen
+
+**Tabellenansicht**
+- Excel-ähnliche Darstellung
+- Inline-Bearbeitung direkt in der Tabelle
+- Schneller Überblick über alle Daten
+- Ideal für Massenbearbeitung
+
+### Batch-Eingabe
+Mehrere Elemente auf einmal erstellen:
+- Button "+ Mehrere" im Elemente-Tab
+- Textfeld für mehrzeilige Eingabe
+- Format: `phase;Name;Start;Ende;Farbe;Puffer;Kritisch`
+- Format: `meilenstein;Name;Datum`
+- Unterstützt YYYY-MM-DD und DD.MM.YYYY
+
+### CSV-Import
+Projektdaten aus Excel importieren:
+- CSV-Datei hochladen (Semikolon- oder Komma-getrennt)
+- Vorlage zum Download verfügbar
+- Erstellt automatisch Gruppen und Elemente
+- Projektdatum wird aus Elementen berechnet
+
+**CSV-Spalten:**
+```
+Typ;Name;Gruppe;Start;Ende;Farbe;Puffer;Kritisch;Einrückung
+gruppe;Phasenplan;;;;;;;;
+phase;Analyse;Phasenplan;2025-01-01;2025-01-31;gruen;0;nein;0
+meilenstein;Go-Live;Phasenplan;2025-03-01;;;;;0
+```
+
+### Verstellbare Panel-Breite
+- Resize-Handle zwischen Editor und Timeline
+- Ziehen mit der Maus zum Anpassen
+- Bereich: 280px - 600px
+- Nützlich für Tabellenansicht
+
+### Präsentations-Ansichten
+Drei umschaltbare Ansichtsmodi im Toolbar für Präsentationen:
+
+**Dunkles Theme (☽/☀)**
+- Toggle zwischen Hell- und Dunkel-Modus
+- Alle Timeline-Elemente passen sich an (Hintergrund, Text, Linien)
+- Legende und Container ebenfalls im Dark Mode
+- Ideal für Präsentationen bei gedimmtem Licht
+
+**Executive Summary ("Exec")**
+- Gefilterte Ansicht nur mit Hauptelementen
+- Zeigt nur Phasen mit Einrückung 0 + alle Meilensteine
+- Canvas-Höhe passt sich automatisch an
+- Perfekt für Management-Präsentationen
+
+**Vertikale Roadmap (↕/↔)**
+- Moderne Roadmap-Ansicht mit mittiger Zeitlinie
+- Phasen alternieren links/rechts der Zeitachse
+- Meilensteine als Rauten auf der Zeitlinie
+- Monatsnamen als horizontale Marker
+- Heute-Linie horizontal
+
+Alle drei Ansichten sind kombinierbar (z.B. vertikale Roadmap im Dark Mode mit Executive Summary).
 
 ### Drag & Drop
 - Elemente per Drag & Drop sortieren
@@ -256,6 +342,11 @@ const labelX = Math.max(labelWidth + 30, x + width / 2);
 - `.drag-over` - Ziel beim Überfahren
 - `.drag-handle` - Griff-Symbol (⋮⋮)
 
+### Panel Resize
+- `.resize-handle` - Trennlinie zwischen Editor und Timeline
+- `.resizing` - Aktiver Resize-Zustand
+- `.sidebar-width` - Editor-Panel mit dynamischer Breite
+
 ## Development
 
 Öffne `index.html` direkt im Browser. Keine Build-Tools erforderlich.
@@ -270,6 +361,7 @@ open index.html
 
 ## Testing Checklist
 
+### Basis-Funktionen
 1. [ ] Neues Projekt erstellen
 2. [ ] Gruppen anlegen und sortieren
 3. [ ] Phasen mit verschiedenen Farben erstellen
@@ -281,12 +373,42 @@ open index.html
 9. [ ] Heute-Linie ein/ausschalten
 10. [ ] Legende prüfen (nur verwendete Elemente)
 11. [ ] Farb-Kategorien umbenennen
-12. [ ] PNG-Export
-13. [ ] SVG-Export
-14. [ ] JSON Export/Import
-15. [ ] Als Vorlage speichern
-16. [ ] Aus Vorlage neues Projekt erstellen
-17. [ ] Browser schließen/öffnen → Persistenz prüfen
+
+### Elemente-Ansichten
+12. [ ] Kompakte Listenansicht: Element aufklappen
+13. [ ] Kompakte Listenansicht: Gruppe ein-/ausklappen
+14. [ ] Tabellenansicht: Inline-Bearbeitung
+15. [ ] Ansichts-Umschalter (Liste ↔ Tabelle)
+
+### Schnell-Eingabe
+16. [ ] Element duplizieren (Button)
+17. [ ] Batch-Eingabe: Mehrere Phasen auf einmal
+18. [ ] Batch-Eingabe: Meilensteine hinzufügen
+
+### Import/Export
+19. [ ] CSV-Vorlage herunterladen
+20. [ ] CSV-Import aus Datei
+21. [ ] JSON Export/Import
+22. [ ] PNG-Export
+23. [ ] SVG-Export
+
+### Vorlagen
+24. [ ] Als Vorlage speichern
+25. [ ] Aus Vorlage neues Projekt erstellen
+
+### Präsentations-Ansichten
+26. [ ] Dunkles Theme: Toggle aktivieren, alle Farben prüfen
+27. [ ] Dunkles Theme: Legende im Dark Mode lesbar
+28. [ ] Executive Summary: Nur Hauptphasen + Meilensteine sichtbar
+29. [ ] Executive Summary: Canvas-Höhe passt sich an
+30. [ ] Vertikale Roadmap: Mittige Zeitlinie korrekt
+31. [ ] Vertikale Roadmap: Phasen alternieren links/rechts
+32. [ ] Vertikale Roadmap: Meilensteine auf Zeitlinie
+33. [ ] Kombinierter Modus: Vertikal + Dark + Executive
+
+### UI
+34. [ ] Panel-Breite per Resize-Handle anpassen
+35. [ ] Browser schließen/öffnen → Persistenz prüfen
 
 ## Bekannte Einschränkungen
 

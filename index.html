@@ -57,6 +57,33 @@
             user-select: none;
         }
         .drag-handle:hover { color: #6B7280; }
+
+        /* Panel Resize Handle */
+        .resize-handle {
+            width: 6px;
+            cursor: col-resize;
+            background: transparent;
+            transition: background-color 0.2s;
+            flex-shrink: 0;
+        }
+        .resize-handle:hover,
+        .resize-handle.resizing {
+            background-color: #3B82F6;
+        }
+        .resize-handle::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 2px;
+            height: 30px;
+            background: #D1D5DB;
+            border-radius: 1px;
+        }
+        .resize-handle:hover::after {
+            background: white;
+        }
         .drag-handle:active { cursor: grabbing; }
 
         /* Print/Export Styles */
@@ -146,6 +173,27 @@
                                 <option value="quartal">Quartale</option>
                             </select>
                         </div>
+                        <div class="flex items-center space-x-2 border-l pl-2 ml-2" v-if="currentProject">
+                            <button @click="darkMode = !darkMode"
+                                    :class="darkMode ? 'bg-gray-700 text-yellow-300' : 'bg-gray-100 text-gray-600'"
+                                    class="px-2 py-1 rounded text-sm hover:opacity-80 flex items-center space-x-1"
+                                    :title="darkMode ? 'Helles Theme' : 'Dunkles Theme'">
+                                <span v-if="darkMode">&#9788;</span>
+                                <span v-else>&#9790;</span>
+                            </button>
+                            <button @click="showExecutiveSummary = !showExecutiveSummary"
+                                    :class="showExecutiveSummary ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600'"
+                                    class="px-2 py-1 rounded text-sm hover:opacity-80"
+                                    title="Executive Summary - Nur Hauptelemente">
+                                Exec
+                            </button>
+                            <button @click="verticalMode = !verticalMode"
+                                    :class="verticalMode ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-600'"
+                                    class="px-2 py-1 rounded text-sm hover:opacity-80"
+                                    title="Vertikale Roadmap">
+                                {{ verticalMode ? '↔' : '↕' }}
+                            </button>
+                        </div>
                     </div>
                     <div class="flex items-center space-x-2">
                         <button @click="showExportModal = true" class="bg-red-700 text-white px-4 py-1.5 rounded text-sm hover:bg-red-800 font-medium">
@@ -166,7 +214,8 @@
 
                 <div v-else class="flex-1 flex overflow-hidden">
                     <!-- Editor Panel -->
-                    <div class="w-96 border-r border-gray-200 bg-white overflow-y-auto p-4 no-print">
+                    <div class="sidebar-width border-r border-gray-200 bg-white overflow-y-auto p-4 no-print flex-shrink-0"
+                         :style="{ width: editorPanelWidth + 'px' }">
                         <!-- Projekt Tab -->
                         <div v-if="activeTab === 'projekt'" class="space-y-4">
                             <h3 class="font-semibold text-gray-800">Projekt-Einstellungen</h3>
@@ -254,204 +303,366 @@
                         </div>
 
                         <!-- Elemente Tab -->
-                        <div v-if="activeTab === 'elemente'" class="space-y-4">
+                        <div v-if="activeTab === 'elemente'" class="space-y-3">
+                            <!-- Header mit Ansichts-Umschalter -->
                             <div class="flex items-center justify-between">
-                                <h3 class="font-semibold text-gray-800">Phasen & Meilensteine</h3>
+                                <div class="flex items-center space-x-3">
+                                    <h3 class="font-semibold text-gray-800">Elemente</h3>
+                                    <div class="flex border border-gray-300 rounded overflow-hidden text-xs">
+                                        <button @click="elementeView = 'kompakt'"
+                                                :class="['px-2 py-1', elementeView === 'kompakt' ? 'bg-gray-700 text-white' : 'bg-white text-gray-600 hover:bg-gray-100']">
+                                            Liste
+                                        </button>
+                                        <button @click="elementeView = 'tabelle'"
+                                                :class="['px-2 py-1', elementeView === 'tabelle' ? 'bg-gray-700 text-white' : 'bg-white text-gray-600 hover:bg-gray-100']">
+                                            Tabelle
+                                        </button>
+                                    </div>
+                                </div>
                                 <div class="flex space-x-2">
                                     <button @click="addElement('phase')" class="text-blue-600 hover:text-blue-800 text-sm font-medium">+ Phase</button>
-                                    <button @click="addElement('meilenstein')" class="text-green-600 hover:text-green-800 text-sm font-medium">+ Meilenstein</button>
+                                    <button @click="addElement('meilenstein')" class="text-green-600 hover:text-green-800 text-sm font-medium">+ MS</button>
+                                    <button @click="openBatchInput" class="text-purple-600 hover:text-purple-800 text-sm font-medium border-l border-gray-300 pl-2">+ Mehrere</button>
                                 </div>
                             </div>
 
-                            <!-- Elemente nach Gruppen sortiert -->
-                            <div v-for="gruppe in sortedGruppen" :key="'grp-' + gruppe.id" class="space-y-2">
-                                <div class="text-sm font-semibold text-gray-700 border-b border-gray-200 pb-1">{{ gruppe.name }}</div>
-                                <div v-for="element in getElementeForGruppe(gruppe.id)" :key="element.id"
-                                     draggable="true"
-                                     @dragstart="onDragStart($event, element)"
-                                     @dragover="onDragOver($event, element)"
-                                     @dragleave="onDragLeave($event)"
-                                     @drop="onDrop($event, element)"
-                                     @dragend="onDragEnd($event)"
-                                     :class="['border border-gray-200 rounded p-3 bg-white draggable-item', dragOverId === element.id ? 'drag-over' : '']">
-                                    <div class="flex items-center space-x-2 mb-2">
-                                        <span class="drag-handle text-lg leading-none" title="Ziehen zum Verschieben">⋮⋮</span>
-                                        <span :class="element.typ === 'phase' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'" class="text-xs px-2 py-0.5 rounded">
-                                            {{ element.typ === 'phase' ? 'Phase' : 'Meilenstein' }}
-                                        </span>
-                                        <input v-model="element.name" @input="saveToStorage" type="text" placeholder="Name" class="flex-1 border border-gray-300 rounded px-2 py-1 text-sm">
-                                    </div>
-
-                                    <!-- Gruppe und Einrückung -->
-                                    <div class="grid grid-cols-2 gap-2 mb-2">
-                                        <div>
-                                            <label class="text-xs text-gray-500">Gruppe</label>
-                                            <select v-model="element.gruppe" @change="saveToStorage" class="w-full border border-gray-300 rounded px-2 py-1 text-sm bg-white">
-                                                <option value="">-- Keine Gruppe --</option>
-                                                <option v-for="g in sortedGruppen" :key="g.id" :value="g.id">{{ g.name }}</option>
-                                            </select>
-                                        </div>
-                                        <div>
-                                            <label class="text-xs text-gray-500">Einrückung</label>
-                                            <select v-model.number="element.einrueckung" @change="saveToStorage" class="w-full border border-gray-300 rounded px-2 py-1 text-sm bg-white">
-                                                <option :value="0">Ebene 1</option>
-                                                <option :value="1">Ebene 2 (eingerückt)</option>
-                                                <option :value="2">Ebene 3 (stark eingerückt)</option>
-                                            </select>
-                                        </div>
-                                    </div>
-
-                                    <!-- Phase-spezifische Felder -->
-                                    <div v-if="element.typ === 'phase'">
-                                        <div class="grid grid-cols-2 gap-2 mb-2">
-                                            <div>
-                                                <label class="text-xs text-gray-500">Start</label>
-                                                <input v-model="element.start" @input="saveToStorage" type="date" class="w-full border border-gray-300 rounded px-2 py-1 text-sm">
-                                            </div>
-                                            <div>
-                                                <label class="text-xs text-gray-500">Ende</label>
-                                                <input v-model="element.ende" @input="saveToStorage" type="date" class="w-full border border-gray-300 rounded px-2 py-1 text-sm">
-                                            </div>
-                                        </div>
-                                        <div class="flex items-center space-x-4 mb-2">
-                                            <label class="flex items-center space-x-1">
-                                                <input type="checkbox" v-model="element.kritisch" @change="saveToStorage" class="rounded">
-                                                <span class="text-xs text-gray-600">Kritischer Pfad</span>
-                                            </label>
-                                            <div class="flex items-center space-x-1">
-                                                <label class="text-xs text-gray-600">Puffer:</label>
-                                                <input v-model.number="element.pufferTage" @input="saveToStorage" type="number" min="0" class="w-14 border border-gray-300 rounded px-2 py-1 text-sm">
-                                                <span class="text-xs text-gray-500">Tage</span>
-                                            </div>
-                                        </div>
+                            <!-- KOMPAKTE LISTENANSICHT -->
+                            <div v-if="elementeView === 'kompakt'">
+                                <!-- Gruppen mit Elementen -->
+                                <div v-for="gruppe in sortedGruppen" :key="'grp-' + gruppe.id" class="mb-3">
+                                    <!-- Gruppen-Header (klappbar) -->
+                                    <div @click="toggleGroupCollapse(gruppe.id)"
+                                         class="flex items-center justify-between bg-gray-100 px-2 py-1.5 rounded cursor-pointer hover:bg-gray-200">
                                         <div class="flex items-center space-x-2">
-                                            <label class="text-xs text-gray-600">Kategorie:</label>
-                                            <button @click="element.farbe = 'gruen'; saveToStorage()"
-                                                    :title="currentProject.einstellungen.farbNamen?.gruen || 'Vorbereitung'"
-                                                    :class="['w-6 h-6 rounded border-2 cursor-pointer', element.farbe === 'gruen' ? 'border-gray-800' : 'border-transparent hover:border-gray-400']"
-                                                    style="background-color: #166534;"></button>
-                                            <button @click="element.farbe = 'rot'; saveToStorage()"
-                                                    :title="currentProject.einstellungen.farbNamen?.rot || 'Plandauer'"
-                                                    :class="['w-6 h-6 rounded border-2 cursor-pointer', element.farbe === 'rot' ? 'border-gray-800' : 'border-transparent hover:border-gray-400']"
-                                                    style="background-color: #991B1B;"></button>
-                                            <button @click="element.farbe = 'dunkelrot'; saveToStorage()"
-                                                    :title="currentProject.einstellungen.farbNamen?.dunkelrot || 'Kritisch'"
-                                                    :class="['w-6 h-6 rounded border-2 cursor-pointer', element.farbe === 'dunkelrot' ? 'border-gray-800' : 'border-transparent hover:border-gray-400']"
-                                                    style="background-color: #450a0a;"></button>
-                                            <span class="text-xs text-gray-400 ml-1">{{ currentProject.einstellungen.farbNamen?.[element.farbe] || '' }}</span>
+                                            <span class="text-gray-500 text-xs">{{ isGroupCollapsed(gruppe.id) ? '▶' : '▼' }}</span>
+                                            <span class="text-sm font-semibold text-gray-700">{{ gruppe.name }}</span>
+                                            <span class="text-xs text-gray-400">({{ getElementeForGruppe(gruppe.id).length }})</span>
                                         </div>
                                     </div>
 
-                                    <!-- Meilenstein-spezifische Felder -->
-                                    <div v-if="element.typ === 'meilenstein'">
-                                        <div class="mb-2">
-                                            <label class="text-xs text-gray-500">Datum</label>
-                                            <input v-model="element.datum" @input="saveToStorage" type="date" class="w-full border border-gray-300 rounded px-2 py-1 text-sm">
-                                        </div>
-                                    </div>
+                                    <!-- Elemente der Gruppe -->
+                                    <div v-if="!isGroupCollapsed(gruppe.id)" class="mt-1 space-y-1">
+                                        <div v-for="element in getElementeForGruppe(gruppe.id)" :key="element.id"
+                                             draggable="true"
+                                             @dragstart="onDragStart($event, element)"
+                                             @dragover="onDragOver($event, element)"
+                                             @dragleave="onDragLeave($event)"
+                                             @drop="onDrop($event, element)"
+                                             @dragend="onDragEnd($event)"
+                                             :class="['border rounded bg-white draggable-item', dragOverId === element.id ? 'drag-over' : 'border-gray-200']">
 
-                                    <div class="flex justify-between items-center mt-2 pt-2 border-t border-gray-100">
-                                        <div class="flex items-center space-x-1">
-                                            <button @click="moveElement(element, -1)" class="text-gray-400 hover:text-gray-600 p-1 text-sm">↑</button>
-                                            <button @click="moveElement(element, 1)" class="text-gray-400 hover:text-gray-600 p-1 text-sm">↓</button>
+                                            <!-- Kompakte Zeile -->
+                                            <div @click="toggleElementExpand(element.id)"
+                                                 class="flex items-center px-2 py-1.5 cursor-pointer hover:bg-gray-50">
+                                                <span class="drag-handle text-gray-400 mr-2 text-sm" @click.stop title="Ziehen">⋮⋮</span>
+                                                <span class="text-gray-400 text-xs mr-2">{{ expandedElementId === element.id ? '▼' : '▶' }}</span>
+                                                <div class="w-3 h-3 rounded-sm mr-2"
+                                                     :style="{ backgroundColor: element.typ === 'phase' ? (element.farbe === 'gruen' ? '#166534' : element.farbe === 'dunkelrot' ? '#450a0a' : '#991B1B') : 'transparent' }"
+                                                     :class="element.typ === 'meilenstein' ? 'border-2 border-amber-600 transform rotate-45' : ''"></div>
+                                                <span :class="['flex-1 text-sm truncate', (element.einrueckung || 0) > 0 ? 'ml-' + (element.einrueckung * 3) : '']">
+                                                    {{ element.name || '(Unbenannt)' }}
+                                                </span>
+                                                <span class="text-xs text-gray-400 ml-2">{{ getElementSummary(element) }}</span>
+                                                <div class="flex items-center ml-2 space-x-1" @click.stop>
+                                                    <button @click="moveElement(element, -1)" class="text-gray-300 hover:text-gray-600 text-xs px-1">↑</button>
+                                                    <button @click="moveElement(element, 1)" class="text-gray-300 hover:text-gray-600 text-xs px-1">↓</button>
+                                                </div>
+                                            </div>
+
+                                            <!-- Aufgeklappte Details -->
+                                            <div v-if="expandedElementId === element.id" class="px-3 pb-3 pt-2 border-t border-gray-100 bg-gray-50">
+                                                <div class="grid grid-cols-2 gap-2 mb-2">
+                                                    <div>
+                                                        <label class="text-xs text-gray-500">Name</label>
+                                                        <input v-model="element.name" @input="saveToStorage" type="text" class="w-full border border-gray-300 rounded px-2 py-1 text-sm">
+                                                    </div>
+                                                    <div>
+                                                        <label class="text-xs text-gray-500">Gruppe</label>
+                                                        <select v-model="element.gruppe" @change="saveToStorage" class="w-full border border-gray-300 rounded px-2 py-1 text-sm bg-white">
+                                                            <option value="">-- Keine --</option>
+                                                            <option v-for="g in sortedGruppen" :key="g.id" :value="g.id">{{ g.name }}</option>
+                                                        </select>
+                                                    </div>
+                                                </div>
+
+                                                <!-- Phase-spezifisch -->
+                                                <div v-if="element.typ === 'phase'">
+                                                    <div class="grid grid-cols-2 gap-2 mb-2">
+                                                        <div>
+                                                            <label class="text-xs text-gray-500">Start</label>
+                                                            <input v-model="element.start" @input="saveToStorage" type="date" class="w-full border border-gray-300 rounded px-2 py-1 text-sm">
+                                                        </div>
+                                                        <div>
+                                                            <label class="text-xs text-gray-500">Ende</label>
+                                                            <input v-model="element.ende" @input="saveToStorage" type="date" class="w-full border border-gray-300 rounded px-2 py-1 text-sm">
+                                                        </div>
+                                                    </div>
+                                                    <div class="flex items-center flex-wrap gap-2 mb-2">
+                                                        <select v-model.number="element.einrueckung" @change="saveToStorage" class="border border-gray-300 rounded px-2 py-1 text-xs bg-white">
+                                                            <option :value="0">Ebene 1</option>
+                                                            <option :value="1">Ebene 2</option>
+                                                            <option :value="2">Ebene 3</option>
+                                                        </select>
+                                                        <label class="flex items-center space-x-1">
+                                                            <input type="checkbox" v-model="element.kritisch" @change="saveToStorage" class="rounded">
+                                                            <span class="text-xs text-gray-600">Kritisch</span>
+                                                        </label>
+                                                        <div class="flex items-center space-x-1">
+                                                            <span class="text-xs text-gray-600">Puffer:</span>
+                                                            <input v-model.number="element.pufferTage" @input="saveToStorage" type="number" min="0" class="w-12 border border-gray-300 rounded px-1 py-0.5 text-xs">
+                                                        </div>
+                                                    </div>
+                                                    <div class="flex items-center space-x-2">
+                                                        <span class="text-xs text-gray-600">Farbe:</span>
+                                                        <button @click="element.farbe = 'gruen'; saveToStorage()" :class="['w-5 h-5 rounded border-2', element.farbe === 'gruen' ? 'border-gray-800' : 'border-transparent']" style="background-color: #166534;"></button>
+                                                        <button @click="element.farbe = 'rot'; saveToStorage()" :class="['w-5 h-5 rounded border-2', element.farbe === 'rot' ? 'border-gray-800' : 'border-transparent']" style="background-color: #991B1B;"></button>
+                                                        <button @click="element.farbe = 'dunkelrot'; saveToStorage()" :class="['w-5 h-5 rounded border-2', element.farbe === 'dunkelrot' ? 'border-gray-800' : 'border-transparent']" style="background-color: #450a0a;"></button>
+                                                    </div>
+                                                </div>
+
+                                                <!-- Meilenstein-spezifisch -->
+                                                <div v-if="element.typ === 'meilenstein'" class="grid grid-cols-2 gap-2">
+                                                    <div>
+                                                        <label class="text-xs text-gray-500">Datum</label>
+                                                        <input v-model="element.datum" @input="saveToStorage" type="date" class="w-full border border-gray-300 rounded px-2 py-1 text-sm">
+                                                    </div>
+                                                    <div>
+                                                        <label class="text-xs text-gray-500">Einrückung</label>
+                                                        <select v-model.number="element.einrueckung" @change="saveToStorage" class="w-full border border-gray-300 rounded px-2 py-1 text-sm bg-white">
+                                                            <option :value="0">Ebene 1</option>
+                                                            <option :value="1">Ebene 2</option>
+                                                            <option :value="2">Ebene 3</option>
+                                                        </select>
+                                                    </div>
+                                                </div>
+
+                                                <div class="flex justify-end space-x-2 mt-2 pt-2 border-t border-gray-200">
+                                                    <button @click="duplicateElement(element)" class="text-blue-500 hover:text-blue-700 text-xs">Duplizieren</button>
+                                                    <button @click="deleteElement(element.id)" class="text-red-500 hover:text-red-700 text-xs">Löschen</button>
+                                                </div>
+                                            </div>
                                         </div>
-                                        <button @click="deleteElement(element.id)" class="text-red-400 hover:text-red-600 text-xs">Löschen</button>
+                                        <div v-if="getElementeForGruppe(gruppe.id).length === 0" class="text-gray-400 text-xs py-2 pl-6">
+                                            Keine Elemente
+                                        </div>
                                     </div>
                                 </div>
-                                <div v-if="getElementeForGruppe(gruppe.id).length === 0" class="text-gray-400 text-xs p-2 text-center">
-                                    Keine Elemente
+
+                                <!-- Elemente ohne Gruppe -->
+                                <div v-if="getElementeForGruppe('').length > 0" class="mb-3">
+                                    <div @click="toggleGroupCollapse('__none__')"
+                                         class="flex items-center justify-between bg-gray-50 px-2 py-1.5 rounded cursor-pointer hover:bg-gray-100">
+                                        <div class="flex items-center space-x-2">
+                                            <span class="text-gray-400 text-xs">{{ isGroupCollapsed('__none__') ? '▶' : '▼' }}</span>
+                                            <span class="text-sm font-medium text-gray-500">Ohne Gruppe</span>
+                                            <span class="text-xs text-gray-400">({{ getElementeForGruppe('').length }})</span>
+                                        </div>
+                                    </div>
+                                    <div v-if="!isGroupCollapsed('__none__')" class="mt-1 space-y-1">
+                                        <div v-for="element in getElementeForGruppe('')" :key="element.id"
+                                             draggable="true"
+                                             @dragstart="onDragStart($event, element)"
+                                             @dragover="onDragOver($event, element)"
+                                             @dragleave="onDragLeave($event)"
+                                             @drop="onDrop($event, element)"
+                                             @dragend="onDragEnd($event)"
+                                             :class="['border rounded bg-white draggable-item', dragOverId === element.id ? 'drag-over' : 'border-gray-200']">
+                                            <!-- Same compact row as above -->
+                                            <div @click="toggleElementExpand(element.id)" class="flex items-center px-2 py-1.5 cursor-pointer hover:bg-gray-50">
+                                                <span class="drag-handle text-gray-400 mr-2 text-sm" @click.stop>⋮⋮</span>
+                                                <span class="text-gray-400 text-xs mr-2">{{ expandedElementId === element.id ? '▼' : '▶' }}</span>
+                                                <div class="w-3 h-3 rounded-sm mr-2"
+                                                     :style="{ backgroundColor: element.typ === 'phase' ? (element.farbe === 'gruen' ? '#166534' : element.farbe === 'dunkelrot' ? '#450a0a' : '#991B1B') : 'transparent' }"
+                                                     :class="element.typ === 'meilenstein' ? 'border-2 border-amber-600 transform rotate-45' : ''"></div>
+                                                <span class="flex-1 text-sm truncate">{{ element.name || '(Unbenannt)' }}</span>
+                                                <span class="text-xs text-gray-400 ml-2">{{ getElementSummary(element) }}</span>
+                                                <div class="flex items-center ml-2 space-x-1" @click.stop>
+                                                    <button @click="moveElement(element, -1)" class="text-gray-300 hover:text-gray-600 text-xs px-1">↑</button>
+                                                    <button @click="moveElement(element, 1)" class="text-gray-300 hover:text-gray-600 text-xs px-1">↓</button>
+                                                </div>
+                                            </div>
+                                            <!-- Expanded details (same as above) -->
+                                            <div v-if="expandedElementId === element.id" class="px-3 pb-3 pt-2 border-t border-gray-100 bg-gray-50">
+                                                <div class="grid grid-cols-2 gap-2 mb-2">
+                                                    <div>
+                                                        <label class="text-xs text-gray-500">Name</label>
+                                                        <input v-model="element.name" @input="saveToStorage" type="text" class="w-full border border-gray-300 rounded px-2 py-1 text-sm">
+                                                    </div>
+                                                    <div>
+                                                        <label class="text-xs text-gray-500">Gruppe</label>
+                                                        <select v-model="element.gruppe" @change="saveToStorage" class="w-full border border-gray-300 rounded px-2 py-1 text-sm bg-white">
+                                                            <option value="">-- Keine --</option>
+                                                            <option v-for="g in sortedGruppen" :key="g.id" :value="g.id">{{ g.name }}</option>
+                                                        </select>
+                                                    </div>
+                                                </div>
+                                                <div v-if="element.typ === 'phase'">
+                                                    <div class="grid grid-cols-2 gap-2 mb-2">
+                                                        <div>
+                                                            <label class="text-xs text-gray-500">Start</label>
+                                                            <input v-model="element.start" @input="saveToStorage" type="date" class="w-full border border-gray-300 rounded px-2 py-1 text-sm">
+                                                        </div>
+                                                        <div>
+                                                            <label class="text-xs text-gray-500">Ende</label>
+                                                            <input v-model="element.ende" @input="saveToStorage" type="date" class="w-full border border-gray-300 rounded px-2 py-1 text-sm">
+                                                        </div>
+                                                    </div>
+                                                    <div class="flex items-center flex-wrap gap-2 mb-2">
+                                                        <select v-model.number="element.einrueckung" @change="saveToStorage" class="border border-gray-300 rounded px-2 py-1 text-xs bg-white">
+                                                            <option :value="0">Ebene 1</option>
+                                                            <option :value="1">Ebene 2</option>
+                                                            <option :value="2">Ebene 3</option>
+                                                        </select>
+                                                        <label class="flex items-center space-x-1">
+                                                            <input type="checkbox" v-model="element.kritisch" @change="saveToStorage" class="rounded">
+                                                            <span class="text-xs text-gray-600">Kritisch</span>
+                                                        </label>
+                                                        <div class="flex items-center space-x-1">
+                                                            <span class="text-xs text-gray-600">Puffer:</span>
+                                                            <input v-model.number="element.pufferTage" @input="saveToStorage" type="number" min="0" class="w-12 border border-gray-300 rounded px-1 py-0.5 text-xs">
+                                                        </div>
+                                                    </div>
+                                                    <div class="flex items-center space-x-2">
+                                                        <span class="text-xs text-gray-600">Farbe:</span>
+                                                        <button @click="element.farbe = 'gruen'; saveToStorage()" :class="['w-5 h-5 rounded border-2', element.farbe === 'gruen' ? 'border-gray-800' : 'border-transparent']" style="background-color: #166534;"></button>
+                                                        <button @click="element.farbe = 'rot'; saveToStorage()" :class="['w-5 h-5 rounded border-2', element.farbe === 'rot' ? 'border-gray-800' : 'border-transparent']" style="background-color: #991B1B;"></button>
+                                                        <button @click="element.farbe = 'dunkelrot'; saveToStorage()" :class="['w-5 h-5 rounded border-2', element.farbe === 'dunkelrot' ? 'border-gray-800' : 'border-transparent']" style="background-color: #450a0a;"></button>
+                                                    </div>
+                                                </div>
+                                                <div v-if="element.typ === 'meilenstein'" class="grid grid-cols-2 gap-2">
+                                                    <div>
+                                                        <label class="text-xs text-gray-500">Datum</label>
+                                                        <input v-model="element.datum" @input="saveToStorage" type="date" class="w-full border border-gray-300 rounded px-2 py-1 text-sm">
+                                                    </div>
+                                                    <div>
+                                                        <label class="text-xs text-gray-500">Einrückung</label>
+                                                        <select v-model.number="element.einrueckung" @change="saveToStorage" class="w-full border border-gray-300 rounded px-2 py-1 text-sm bg-white">
+                                                            <option :value="0">Ebene 1</option>
+                                                            <option :value="1">Ebene 2</option>
+                                                            <option :value="2">Ebene 3</option>
+                                                        </select>
+                                                    </div>
+                                                </div>
+                                                <div class="flex justify-end space-x-2 mt-2 pt-2 border-t border-gray-200">
+                                                    <button @click="duplicateElement(element)" class="text-blue-500 hover:text-blue-700 text-xs">Duplizieren</button>
+                                                    <button @click="deleteElement(element.id)" class="text-red-500 hover:text-red-700 text-xs">Löschen</button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
 
-                            <!-- Elemente ohne Gruppe -->
-                            <div v-if="getElementeForGruppe('').length > 0" class="space-y-2">
-                                <div class="text-sm font-semibold text-gray-500 border-b border-gray-200 pb-1">Ohne Gruppe</div>
-                                <div v-for="element in getElementeForGruppe('')" :key="element.id"
-                                     draggable="true"
-                                     @dragstart="onDragStart($event, element)"
-                                     @dragover="onDragOver($event, element)"
-                                     @dragleave="onDragLeave($event)"
-                                     @drop="onDrop($event, element)"
-                                     @dragend="onDragEnd($event)"
-                                     :class="['border border-gray-200 rounded p-3 bg-white draggable-item', dragOverId === element.id ? 'drag-over' : '']">
-                                    <!-- Same content as above -->
-                                    <div class="flex items-center space-x-2 mb-2">
-                                        <span class="drag-handle text-lg leading-none" title="Ziehen zum Verschieben">⋮⋮</span>
-                                        <span :class="element.typ === 'phase' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'" class="text-xs px-2 py-0.5 rounded">
-                                            {{ element.typ === 'phase' ? 'Phase' : 'Meilenstein' }}
-                                        </span>
-                                        <input v-model="element.name" @input="saveToStorage" type="text" placeholder="Name" class="flex-1 border border-gray-300 rounded px-2 py-1 text-sm">
-                                    </div>
-                                    <div class="grid grid-cols-2 gap-2 mb-2">
-                                        <div>
-                                            <label class="text-xs text-gray-500">Gruppe</label>
-                                            <select v-model="element.gruppe" @change="saveToStorage" class="w-full border border-gray-300 rounded px-2 py-1 text-sm bg-white">
-                                                <option value="">-- Keine Gruppe --</option>
-                                                <option v-for="g in sortedGruppen" :key="g.id" :value="g.id">{{ g.name }}</option>
-                                            </select>
-                                        </div>
-                                        <div>
-                                            <label class="text-xs text-gray-500">Einrückung</label>
-                                            <select v-model.number="element.einrueckung" @change="saveToStorage" class="w-full border border-gray-300 rounded px-2 py-1 text-sm bg-white">
-                                                <option :value="0">Ebene 1</option>
-                                                <option :value="1">Ebene 2 (eingerückt)</option>
-                                                <option :value="2">Ebene 3 (stark eingerückt)</option>
-                                            </select>
-                                        </div>
-                                    </div>
-                                    <div v-if="element.typ === 'phase'">
-                                        <div class="grid grid-cols-2 gap-2 mb-2">
-                                            <div>
-                                                <label class="text-xs text-gray-500">Start</label>
-                                                <input v-model="element.start" @input="saveToStorage" type="date" class="w-full border border-gray-300 rounded px-2 py-1 text-sm">
-                                            </div>
-                                            <div>
-                                                <label class="text-xs text-gray-500">Ende</label>
-                                                <input v-model="element.ende" @input="saveToStorage" type="date" class="w-full border border-gray-300 rounded px-2 py-1 text-sm">
-                                            </div>
-                                        </div>
-                                        <div class="flex items-center space-x-4 mb-2">
-                                            <label class="flex items-center space-x-1">
-                                                <input type="checkbox" v-model="element.kritisch" @change="saveToStorage" class="rounded">
-                                                <span class="text-xs text-gray-600">Kritischer Pfad</span>
-                                            </label>
-                                            <div class="flex items-center space-x-1">
-                                                <label class="text-xs text-gray-600">Puffer:</label>
-                                                <input v-model.number="element.pufferTage" @input="saveToStorage" type="number" min="0" class="w-14 border border-gray-300 rounded px-2 py-1 text-sm">
-                                                <span class="text-xs text-gray-500">Tage</span>
-                                            </div>
-                                        </div>
-                                        <div class="flex items-center space-x-2">
-                                            <label class="text-xs text-gray-600">Kategorie:</label>
-                                            <button @click="element.farbe = 'gruen'; saveToStorage()"
-                                                    :title="currentProject.einstellungen.farbNamen?.gruen || 'Vorbereitung'"
-                                                    :class="['w-6 h-6 rounded border-2 cursor-pointer', element.farbe === 'gruen' ? 'border-gray-800' : 'border-transparent hover:border-gray-400']"
-                                                    style="background-color: #166534;"></button>
-                                            <button @click="element.farbe = 'rot'; saveToStorage()"
-                                                    :title="currentProject.einstellungen.farbNamen?.rot || 'Plandauer'"
-                                                    :class="['w-6 h-6 rounded border-2 cursor-pointer', element.farbe === 'rot' ? 'border-gray-800' : 'border-transparent hover:border-gray-400']"
-                                                    style="background-color: #991B1B;"></button>
-                                            <button @click="element.farbe = 'dunkelrot'; saveToStorage()"
-                                                    :title="currentProject.einstellungen.farbNamen?.dunkelrot || 'Kritisch'"
-                                                    :class="['w-6 h-6 rounded border-2 cursor-pointer', element.farbe === 'dunkelrot' ? 'border-gray-800' : 'border-transparent hover:border-gray-400']"
-                                                    style="background-color: #450a0a;"></button>
-                                            <span class="text-xs text-gray-400 ml-1">{{ currentProject.einstellungen.farbNamen?.[element.farbe] || '' }}</span>
-                                        </div>
-                                    </div>
-                                    <div v-if="element.typ === 'meilenstein'">
-                                        <div class="mb-2">
-                                            <label class="text-xs text-gray-500">Datum</label>
-                                            <input v-model="element.datum" @input="saveToStorage" type="date" class="w-full border border-gray-300 rounded px-2 py-1 text-sm">
-                                        </div>
-                                    </div>
-                                    <div class="flex justify-between items-center mt-2 pt-2 border-t border-gray-100">
-                                        <div class="flex items-center space-x-1">
-                                            <button @click="moveElement(element, -1)" class="text-gray-400 hover:text-gray-600 p-1 text-sm">↑</button>
-                                            <button @click="moveElement(element, 1)" class="text-gray-400 hover:text-gray-600 p-1 text-sm">↓</button>
-                                        </div>
-                                        <button @click="deleteElement(element.id)" class="text-red-400 hover:text-red-600 text-xs">Löschen</button>
-                                    </div>
-                                </div>
+                            <!-- TABELLENANSICHT -->
+                            <div v-if="elementeView === 'tabelle'" class="overflow-x-auto">
+                                <table class="w-full text-xs border-collapse">
+                                    <thead>
+                                        <tr class="bg-gray-100">
+                                            <th class="text-left p-1.5 border-b border-gray-300 w-8"></th>
+                                            <th class="text-left p-1.5 border-b border-gray-300">Name</th>
+                                            <th class="text-left p-1.5 border-b border-gray-300 w-20">Typ</th>
+                                            <th class="text-left p-1.5 border-b border-gray-300 w-24">Start</th>
+                                            <th class="text-left p-1.5 border-b border-gray-300 w-24">Ende</th>
+                                            <th class="text-left p-1.5 border-b border-gray-300 w-16">Farbe</th>
+                                            <th class="text-left p-1.5 border-b border-gray-300 w-20">Aktionen</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <template v-for="gruppe in sortedGruppen" :key="'tbl-grp-' + gruppe.id">
+                                            <tr class="bg-gray-50">
+                                                <td colspan="7" class="p-1.5 font-semibold text-gray-700 border-b border-gray-200">
+                                                    {{ gruppe.name }}
+                                                </td>
+                                            </tr>
+                                            <tr v-for="element in getElementeForGruppe(gruppe.id)" :key="'tbl-' + element.id"
+                                                class="hover:bg-blue-50 border-b border-gray-100"
+                                                draggable="true"
+                                                @dragstart="onDragStart($event, element)"
+                                                @dragover="onDragOver($event, element)"
+                                                @dragleave="onDragLeave($event)"
+                                                @drop="onDrop($event, element)"
+                                                @dragend="onDragEnd($event)">
+                                                <td class="p-1 text-center">
+                                                    <span class="drag-handle text-gray-400 cursor-grab">⋮⋮</span>
+                                                </td>
+                                                <td class="p-1">
+                                                    <input v-model="element.name" @input="saveToStorage" type="text"
+                                                           class="w-full border border-transparent hover:border-gray-300 focus:border-blue-400 rounded px-1 py-0.5 bg-transparent">
+                                                </td>
+                                                <td class="p-1">
+                                                    <span :class="element.typ === 'phase' ? 'text-red-600' : 'text-amber-600'">
+                                                        {{ element.typ === 'phase' ? 'Phase' : 'MS' }}
+                                                    </span>
+                                                </td>
+                                                <td class="p-1">
+                                                    <input v-if="element.typ === 'phase'" v-model="element.start" @input="saveToStorage" type="date"
+                                                           class="w-full border border-transparent hover:border-gray-300 focus:border-blue-400 rounded px-1 py-0.5 bg-transparent text-xs">
+                                                    <input v-else v-model="element.datum" @input="saveToStorage" type="date"
+                                                           class="w-full border border-transparent hover:border-gray-300 focus:border-blue-400 rounded px-1 py-0.5 bg-transparent text-xs">
+                                                </td>
+                                                <td class="p-1">
+                                                    <input v-if="element.typ === 'phase'" v-model="element.ende" @input="saveToStorage" type="date"
+                                                           class="w-full border border-transparent hover:border-gray-300 focus:border-blue-400 rounded px-1 py-0.5 bg-transparent text-xs">
+                                                    <span v-else class="text-gray-300">-</span>
+                                                </td>
+                                                <td class="p-1">
+                                                    <div v-if="element.typ === 'phase'" class="flex space-x-1">
+                                                        <button @click="element.farbe = 'gruen'; saveToStorage()" :class="['w-4 h-4 rounded', element.farbe === 'gruen' ? 'ring-2 ring-gray-800' : '']" style="background-color: #166534;"></button>
+                                                        <button @click="element.farbe = 'rot'; saveToStorage()" :class="['w-4 h-4 rounded', element.farbe === 'rot' ? 'ring-2 ring-gray-800' : '']" style="background-color: #991B1B;"></button>
+                                                        <button @click="element.farbe = 'dunkelrot'; saveToStorage()" :class="['w-4 h-4 rounded', element.farbe === 'dunkelrot' ? 'ring-2 ring-gray-800' : '']" style="background-color: #450a0a;"></button>
+                                                    </div>
+                                                    <span v-else class="text-gray-300">-</span>
+                                                </td>
+                                                <td class="p-1">
+                                                    <div class="flex space-x-1">
+                                                        <button @click="duplicateElement(element)" class="text-blue-400 hover:text-blue-600" title="Duplizieren">D</button>
+                                                        <button @click="deleteElement(element.id)" class="text-red-400 hover:text-red-600" title="Löschen">X</button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        </template>
+                                        <!-- Ohne Gruppe -->
+                                        <template v-if="getElementeForGruppe('').length > 0">
+                                            <tr class="bg-gray-50">
+                                                <td colspan="7" class="p-1.5 font-medium text-gray-500 border-b border-gray-200">Ohne Gruppe</td>
+                                            </tr>
+                                            <tr v-for="element in getElementeForGruppe('')" :key="'tbl-ng-' + element.id"
+                                                class="hover:bg-blue-50 border-b border-gray-100"
+                                                draggable="true"
+                                                @dragstart="onDragStart($event, element)"
+                                                @dragover="onDragOver($event, element)"
+                                                @dragleave="onDragLeave($event)"
+                                                @drop="onDrop($event, element)"
+                                                @dragend="onDragEnd($event)">
+                                                <td class="p-1 text-center"><span class="drag-handle text-gray-400 cursor-grab">⋮⋮</span></td>
+                                                <td class="p-1"><input v-model="element.name" @input="saveToStorage" type="text" class="w-full border border-transparent hover:border-gray-300 focus:border-blue-400 rounded px-1 py-0.5 bg-transparent"></td>
+                                                <td class="p-1"><span :class="element.typ === 'phase' ? 'text-red-600' : 'text-amber-600'">{{ element.typ === 'phase' ? 'Phase' : 'MS' }}</span></td>
+                                                <td class="p-1">
+                                                    <input v-if="element.typ === 'phase'" v-model="element.start" @input="saveToStorage" type="date" class="w-full border border-transparent hover:border-gray-300 focus:border-blue-400 rounded px-1 py-0.5 bg-transparent text-xs">
+                                                    <input v-else v-model="element.datum" @input="saveToStorage" type="date" class="w-full border border-transparent hover:border-gray-300 focus:border-blue-400 rounded px-1 py-0.5 bg-transparent text-xs">
+                                                </td>
+                                                <td class="p-1">
+                                                    <input v-if="element.typ === 'phase'" v-model="element.ende" @input="saveToStorage" type="date" class="w-full border border-transparent hover:border-gray-300 focus:border-blue-400 rounded px-1 py-0.5 bg-transparent text-xs">
+                                                    <span v-else class="text-gray-300">-</span>
+                                                </td>
+                                                <td class="p-1">
+                                                    <div v-if="element.typ === 'phase'" class="flex space-x-1">
+                                                        <button @click="element.farbe = 'gruen'; saveToStorage()" :class="['w-4 h-4 rounded', element.farbe === 'gruen' ? 'ring-2 ring-gray-800' : '']" style="background-color: #166534;"></button>
+                                                        <button @click="element.farbe = 'rot'; saveToStorage()" :class="['w-4 h-4 rounded', element.farbe === 'rot' ? 'ring-2 ring-gray-800' : '']" style="background-color: #991B1B;"></button>
+                                                        <button @click="element.farbe = 'dunkelrot'; saveToStorage()" :class="['w-4 h-4 rounded', element.farbe === 'dunkelrot' ? 'ring-2 ring-gray-800' : '']" style="background-color: #450a0a;"></button>
+                                                    </div>
+                                                    <span v-else class="text-gray-300">-</span>
+                                                </td>
+                                                <td class="p-1">
+                                                    <div class="flex space-x-1">
+                                                        <button @click="duplicateElement(element)" class="text-blue-400 hover:text-blue-600">D</button>
+                                                        <button @click="deleteElement(element.id)" class="text-red-400 hover:text-red-600">X</button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        </template>
+                                    </tbody>
+                                </table>
                             </div>
 
                             <div v-if="currentProject.elemente.length === 0" class="text-gray-400 text-sm p-4 text-center border border-dashed border-gray-300 rounded">
@@ -461,90 +672,100 @@
                         </div>
                     </div>
 
+                    <!-- Resize Handle -->
+                    <div class="resize-handle relative no-print"
+                         :class="{ 'resizing': isResizing }"
+                         @mousedown="startResize"></div>
+
                     <!-- Timeline Canvas -->
                     <div class="flex-1 overflow-auto bg-gray-200 p-6">
-                        <div ref="timelineContainer" class="bg-white shadow-lg" :style="{ minWidth: canvasWidth + 'px' }">
+                        <div ref="timelineContainer" class="shadow-lg"
+                             :class="darkMode ? 'bg-gray-900' : 'bg-white'"
+                             :style="{ minWidth: (verticalMode ? verticalCanvasWidth : canvasWidth) + 'px' }">
                             <!-- Legende -->
-                            <div v-if="currentProject.einstellungen.legendeAnzeigen" class="px-6 pt-4 pb-2 border-b border-gray-200 flex items-center flex-wrap gap-x-6 gap-y-2 text-xs">
+                            <div v-if="currentProject.einstellungen.legendeAnzeigen"
+                                 class="px-6 pt-4 pb-2 border-b flex items-center flex-wrap gap-x-6 gap-y-2 text-xs"
+                                 :class="darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'">
                                 <!-- Dynamische Farb-Kategorien -->
                                 <template v-for="color in usedColors" :key="color.key">
                                     <div class="flex items-center space-x-2">
                                         <div class="w-8 h-3 rounded-sm" :style="{ backgroundColor: color.hex }"></div>
-                                        <span class="text-gray-600">{{ color.name }}</span>
+                                        <span :class="darkMode ? 'text-gray-300' : 'text-gray-600'">{{ color.name }}</span>
                                     </div>
                                 </template>
                                 <div v-if="hasBuffer" class="flex items-center space-x-2">
-                                    <svg width="32" height="12"><line x1="0" y1="6" x2="32" y2="6" stroke="#991B1B" stroke-width="3" stroke-dasharray="8,4"/></svg>
-                                    <span class="text-gray-600">Zeitreserve</span>
+                                    <svg width="32" height="12"><line x1="0" y1="6" x2="32" y2="6" :stroke="themeColors.milestone" stroke-width="3" stroke-dasharray="8,4"/></svg>
+                                    <span :class="darkMode ? 'text-gray-300' : 'text-gray-600'">Zeitreserve</span>
                                 </div>
                                 <div v-if="hasMilestones" class="flex items-center space-x-2">
-                                    <svg width="16" height="16" viewBox="0 0 16 16"><polygon points="8,2 14,8 8,14 2,8" fill="none" stroke="#991B1B" stroke-width="1.5"/></svg>
-                                    <span class="text-gray-600">Meilenstein</span>
+                                    <svg width="16" height="16" viewBox="0 0 16 16"><polygon points="8,2 14,8 8,14 2,8" fill="none" :stroke="themeColors.milestone" stroke-width="1.5"/></svg>
+                                    <span :class="darkMode ? 'text-gray-300' : 'text-gray-600'">Meilenstein</span>
                                 </div>
                                 <div v-if="hasCritical" class="flex items-center space-x-2">
-                                    <div class="w-0.5 h-4 bg-gray-800"></div>
-                                    <span class="text-gray-600">Kritischer Pfad</span>
+                                    <div class="w-0.5 h-4" :class="darkMode ? 'bg-gray-300' : 'bg-gray-800'"></div>
+                                    <span :class="darkMode ? 'text-gray-300' : 'text-gray-600'">Kritischer Pfad</span>
                                 </div>
                             </div>
 
-                            <svg ref="timelineSvg" :width="canvasWidth" :height="canvasHeight" class="timeline-svg">
+                            <!-- Horizontale Timeline -->
+                            <svg v-if="!verticalMode" ref="timelineSvg" :width="canvasWidth" :height="canvasHeight" class="timeline-svg">
                                 <!-- Hintergrund -->
-                                <rect x="0" y="0" :width="canvasWidth" :height="canvasHeight" fill="#F9FAFB"/>
+                                <rect x="0" y="0" :width="canvasWidth" :height="canvasHeight" :fill="themeColors.background"/>
 
                                 <!-- Zeitachse Header - Jahr -->
                                 <g class="time-axis-year">
-                                    <rect :x="labelWidth" y="0" :width="canvasWidth - labelWidth" height="24" fill="#F3F4F6"/>
+                                    <rect :x="labelWidth" y="0" :width="canvasWidth - labelWidth" height="24" :fill="themeColors.headerBg"/>
                                     <template v-for="(year, index) in yearPeriods" :key="'y-' + index">
-                                        <text v-if="year.showLabel" :x="year.labelX" y="16" text-anchor="middle" font-size="13" font-weight="600" fill="#374151">
+                                        <text v-if="year.showLabel" :x="year.labelX" y="16" text-anchor="middle" font-size="13" font-weight="600" :fill="themeColors.textPrimary">
                                             {{ year.label }}
                                         </text>
-                                        <line v-if="index > 0" :x1="year.x" y1="0" :x2="year.x" y2="24" stroke="#D1D5DB" stroke-width="1"/>
+                                        <line v-if="index > 0" :x1="year.x" y1="0" :x2="year.x" y2="24" :stroke="themeColors.border" stroke-width="1"/>
                                     </template>
                                 </g>
 
                                 <!-- Zeitachse Header - Monate -->
                                 <g class="time-axis-months">
-                                    <rect :x="labelWidth" y="24" :width="canvasWidth - labelWidth" height="24" fill="#F9FAFB"/>
-                                    <line :x1="labelWidth" y1="24" :x2="canvasWidth" y2="24" stroke="#D1D5DB" stroke-width="1"/>
+                                    <rect :x="labelWidth" y="24" :width="canvasWidth - labelWidth" height="24" :fill="themeColors.background"/>
+                                    <line :x1="labelWidth" y1="24" :x2="canvasWidth" y2="24" :stroke="themeColors.border" stroke-width="1"/>
                                     <template v-for="(period, index) in timePeriods" :key="'m-' + index">
-                                        <text :x="period.x + period.width/2" y="40" text-anchor="middle" font-size="11" fill="#6B7280">
+                                        <text :x="period.x + period.width/2" y="40" text-anchor="middle" font-size="11" :fill="themeColors.textSecondary">
                                             {{ period.label }}
                                         </text>
-                                        <line :x1="period.x" y1="24" :x2="period.x" :y2="canvasHeight" class="grid-line-light"/>
+                                        <line :x1="period.x" y1="24" :x2="period.x" :y2="canvasHeight" :stroke="themeColors.gridLine" stroke-width="0.5"/>
                                     </template>
                                 </g>
 
                                 <!-- Thema Label -->
                                 <g class="theme-label">
-                                    <rect x="0" y="0" :width="labelWidth" height="48" fill="#F3F4F6"/>
-                                    <text x="12" y="32" font-size="13" font-weight="600" fill="#374151">Thema</text>
-                                    <line x1="0" y1="48" :x2="canvasWidth" y2="48" stroke="#D1D5DB" stroke-width="1"/>
-                                    <line :x1="labelWidth" y1="0" :x2="labelWidth" :y2="canvasHeight" stroke="#D1D5DB" stroke-width="1"/>
+                                    <rect x="0" y="0" :width="labelWidth" height="48" :fill="themeColors.headerBg"/>
+                                    <text x="12" y="32" font-size="13" font-weight="600" :fill="themeColors.textPrimary">Thema</text>
+                                    <line x1="0" y1="48" :x2="canvasWidth" y2="48" :stroke="themeColors.border" stroke-width="1"/>
+                                    <line :x1="labelWidth" y1="0" :x2="labelWidth" :y2="canvasHeight" :stroke="themeColors.border" stroke-width="1"/>
                                 </g>
 
                                 <!-- Heute-Markierung oben -->
                                 <g v-if="currentProject.einstellungen.heuteAnzeigen && todayX >= labelWidth" class="today-marker">
-                                    <rect :x="todayX - 25" y="2" width="50" height="18" fill="#991B1B" rx="2"/>
+                                    <rect :x="todayX - 25" y="2" width="50" height="18" :fill="themeColors.todayBg" rx="2"/>
                                     <text :x="todayX" y="14" text-anchor="middle" font-size="10" fill="white" font-weight="500">Heute</text>
                                 </g>
 
                                 <!-- Content Rows -->
                                 <g class="content-rows" transform="translate(0, 48)">
-                                    <template v-for="(row, rowIndex) in timelineRows" :key="'row-' + rowIndex">
+                                    <template v-for="(row, rowIndex) in displayRows" :key="'row-' + rowIndex">
                                         <!-- Row Background -->
                                         <rect x="0" :y="rowIndex * rowHeight" :width="canvasWidth" :height="rowHeight"
-                                              :fill="rowIndex % 2 === 0 ? '#FFFFFF' : '#FAFAFA'" class="row-hover"/>
-                                        <line x1="0" :y1="(rowIndex + 1) * rowHeight" :x2="canvasWidth" :y2="(rowIndex + 1) * rowHeight" stroke="#E5E7EB" stroke-width="0.5"/>
+                                              :fill="rowIndex % 2 === 0 ? themeColors.rowEven : themeColors.rowOdd" class="row-hover"/>
+                                        <line x1="0" :y1="(rowIndex + 1) * rowHeight" :x2="canvasWidth" :y2="(rowIndex + 1) * rowHeight" :stroke="themeColors.gridLine" stroke-width="0.5"/>
 
                                         <!-- Label -->
                                         <text v-if="row.type === 'gruppe'"
                                               x="12" :y="rowIndex * rowHeight + rowHeight/2 + 4"
-                                              font-size="12" font-weight="700" :fill="row.color || '#991B1B'">
+                                              font-size="12" font-weight="700" :fill="row.color || themeColors.milestone">
                                             {{ row.name }}
                                         </text>
                                         <text v-else
                                               :x="24 + (row.einrueckung || 0) * 16" :y="rowIndex * rowHeight + rowHeight/2 + 4"
-                                              font-size="11" fill="#374151">
+                                              font-size="11" :fill="themeColors.textPrimary">
                                             {{ row.name }}
                                         </text>
 
@@ -565,7 +786,8 @@
                                                   :y1="rowIndex * rowHeight + 4"
                                                   :x2="row.startX + row.width"
                                                   :y2="rowIndex * rowHeight + rowHeight - 4"
-                                                  class="critical-marker"/>
+                                                  :stroke="themeColors.milestone"
+                                                  stroke-width="2"/>
 
                                             <!-- Puffer (gestrichelte Linie) -->
                                             <line v-if="row.pufferWidth > 0"
@@ -580,15 +802,112 @@
                                         <!-- Meilenstein -->
                                         <g v-if="row.type === 'meilenstein' && row.x !== null">
                                             <polygon :points="getMilestonePoints(row.x, rowIndex * rowHeight + rowHeight/2)"
-                                                     fill="none" stroke="#991B1B" stroke-width="1.5"
+                                                     fill="none" :stroke="themeColors.milestone" stroke-width="1.5"
                                                      class="milestone-icon"/>
                                         </g>
                                     </template>
 
                                     <!-- Heute-Linie vertikal -->
                                     <line v-if="currentProject.einstellungen.heuteAnzeigen && todayX >= labelWidth"
-                                          :x1="todayX" y1="0" :x2="todayX" :y2="timelineRows.length * rowHeight"
-                                          class="today-line"/>
+                                          :x1="todayX" y1="0" :x2="todayX" :y2="displayRows.length * rowHeight"
+                                          :stroke="darkMode ? '#F3F4F6' : '#1F2937'"
+                                          stroke-width="2"/>
+                                </g>
+                            </svg>
+
+                            <!-- Vertikale Roadmap -->
+                            <svg v-else ref="timelineSvg" :width="verticalCanvasWidth" :height="verticalCanvasHeight" class="timeline-svg">
+                                <!-- Hintergrund -->
+                                <rect x="0" y="0" :width="verticalCanvasWidth" :height="verticalCanvasHeight" :fill="themeColors.background"/>
+
+                                <!-- Header -->
+                                <rect x="0" y="0" :width="verticalCanvasWidth" height="40" :fill="themeColors.headerBg"/>
+                                <text :x="verticalCanvasWidth / 2" y="26" text-anchor="middle" font-size="14" font-weight="600" :fill="themeColors.textPrimary">
+                                    {{ currentProject.projekt.name }}
+                                </text>
+                                <line x1="0" y1="40" :x2="verticalCanvasWidth" y2="40" :stroke="themeColors.border" stroke-width="1"/>
+
+                                <!-- Mittige Zeitlinie -->
+                                <line :x1="verticalCanvasWidth / 2" y1="50" :x2="verticalCanvasWidth / 2" :y2="verticalCanvasHeight - 20"
+                                      :stroke="themeColors.border" stroke-width="2"/>
+
+                                <!-- Zeitperioden-Marker (Monate) -->
+                                <template v-for="(period, index) in verticalTimePeriods" :key="'vp-' + index">
+                                    <!-- Horizontale Linie -->
+                                    <line x1="100" :y1="period.y" :x2="verticalCanvasWidth - 100" :y2="period.y"
+                                          :stroke="themeColors.gridLine" stroke-width="0.5" stroke-dasharray="4,4"/>
+                                    <!-- Monatslabel links -->
+                                    <text x="90" :y="period.y + 4" text-anchor="end" font-size="10" :fill="themeColors.textSecondary">
+                                        {{ period.label }}
+                                    </text>
+                                </template>
+
+                                <!-- Elemente -->
+                                <template v-for="(elem, index) in verticalElements" :key="'ve-' + index">
+                                    <!-- Gruppen-Header -->
+                                    <g v-if="elem.type === 'gruppe'">
+                                        <text :x="verticalCanvasWidth / 2" :y="verticalHeaderHeight - 10" text-anchor="middle"
+                                              font-size="11" font-weight="700" :fill="themeColors.milestone">
+                                            {{ elem.name }}
+                                        </text>
+                                    </g>
+
+                                    <!-- Phase (links oder rechts) -->
+                                    <g v-if="elem.type === 'phase'">
+                                        <!-- Verbindungslinie zur Zeitlinie -->
+                                        <line :x1="elem.side === 'left' ? verticalCanvasWidth/2 - 80 : verticalCanvasWidth/2 + 80"
+                                              :y1="elem.startY + elem.height/2"
+                                              :x2="verticalCanvasWidth / 2"
+                                              :y2="elem.startY + elem.height/2"
+                                              :stroke="elem.color" stroke-width="1"/>
+                                        <!-- Punkt auf der Zeitlinie -->
+                                        <circle :cx="verticalCanvasWidth / 2" :cy="elem.startY + elem.height/2" r="4" :fill="elem.color"/>
+                                        <!-- Phasen-Block -->
+                                        <rect :x="elem.side === 'left' ? verticalCanvasWidth/2 - 200 : verticalCanvasWidth/2 + 80"
+                                              :y="elem.startY"
+                                              width="120"
+                                              :height="Math.max(elem.height, 24)"
+                                              :fill="elem.color"
+                                              rx="4"
+                                              class="phase-bar"/>
+                                        <!-- Phasen-Name -->
+                                        <text :x="elem.side === 'left' ? verticalCanvasWidth/2 - 140 : verticalCanvasWidth/2 + 140"
+                                              :y="elem.startY + Math.max(elem.height, 24)/2 + 4"
+                                              text-anchor="middle"
+                                              font-size="10" fill="white" font-weight="500">
+                                            {{ elem.name.length > 14 ? elem.name.substring(0, 14) + '...' : elem.name }}
+                                        </text>
+                                        <!-- Kritischer Pfad Markierung -->
+                                        <line v-if="elem.kritisch"
+                                              :x1="elem.side === 'left' ? verticalCanvasWidth/2 - 200 : verticalCanvasWidth/2 + 80"
+                                              :y1="elem.startY + elem.height"
+                                              :x2="elem.side === 'left' ? verticalCanvasWidth/2 - 80 : verticalCanvasWidth/2 + 200"
+                                              :y2="elem.startY + elem.height"
+                                              :stroke="themeColors.milestone"
+                                              stroke-width="2"/>
+                                    </g>
+
+                                    <!-- Meilenstein -->
+                                    <g v-if="elem.type === 'meilenstein'">
+                                        <!-- Raute auf Zeitlinie -->
+                                        <polygon :points="getMilestonePoints(verticalCanvasWidth/2, elem.y)"
+                                                 fill="none" :stroke="themeColors.milestone" stroke-width="2"/>
+                                        <!-- Label -->
+                                        <text :x="elem.side === 'left' ? verticalCanvasWidth/2 - 20 : verticalCanvasWidth/2 + 20"
+                                              :y="elem.y + 4"
+                                              :text-anchor="elem.side === 'left' ? 'end' : 'start'"
+                                              font-size="10" font-weight="500" :fill="themeColors.textPrimary">
+                                            {{ elem.name }}
+                                        </text>
+                                    </g>
+                                </template>
+
+                                <!-- Heute-Linie horizontal -->
+                                <g v-if="currentProject.einstellungen.heuteAnzeigen && todayY >= verticalHeaderHeight">
+                                    <line x1="50" :y1="todayY" :x2="verticalCanvasWidth - 50" :y2="todayY"
+                                          :stroke="themeColors.todayBg" stroke-width="2"/>
+                                    <rect :x="verticalCanvasWidth - 70" :y="todayY - 10" width="50" height="18" :fill="themeColors.todayBg" rx="2"/>
+                                    <text :x="verticalCanvasWidth - 45" :y="todayY + 3" text-anchor="middle" font-size="9" fill="white" font-weight="500">Heute</text>
                                 </g>
                             </svg>
                         </div>
@@ -631,20 +950,40 @@
             </div>
         </div>
 
-        <!-- JSON Import/Export Modal -->
+        <!-- JSON/CSV Import/Export Modal -->
         <div v-if="showImportExportModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div class="bg-white rounded-lg shadow-xl p-6 w-[550px]">
-                <h3 class="text-lg font-semibold mb-4">JSON Import/Export</h3>
+            <div class="bg-white rounded-lg shadow-xl p-6 w-[600px] max-h-[90vh] overflow-y-auto">
+                <h3 class="text-lg font-semibold mb-4">Import/Export</h3>
+
+                <!-- CSV Import Section -->
+                <div class="mb-6 p-4 bg-green-50 border border-green-200 rounded">
+                    <h4 class="font-medium text-green-800 mb-2">CSV Import (aus Excel)</h4>
+                    <p class="text-xs text-green-700 mb-3">
+                        Importiere Projektdaten aus einer CSV-Datei. Erstelle die Datei in Excel und speichere sie als CSV (Semikolon-getrennt).
+                    </p>
+                    <div class="flex items-center space-x-2">
+                        <label class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 cursor-pointer text-sm">
+                            CSV-Datei auswählen
+                            <input type="file" accept=".csv" @change="handleCsvFileSelect" class="hidden">
+                        </label>
+                        <button @click="downloadCsvTemplate" class="px-4 py-2 border border-green-600 text-green-600 rounded hover:bg-green-50 text-sm">
+                            Vorlage herunterladen
+                        </button>
+                    </div>
+                </div>
+
+                <!-- JSON Section -->
                 <div class="space-y-4">
+                    <h4 class="font-medium text-gray-700">JSON Import/Export</h4>
                     <div>
                         <label class="block text-sm text-gray-600 mb-1">Projekt-JSON</label>
-                        <textarea v-model="jsonDataInput" rows="14" class="w-full border border-gray-300 rounded px-3 py-2 font-mono text-xs"></textarea>
+                        <textarea v-model="jsonDataInput" rows="12" class="w-full border border-gray-300 rounded px-3 py-2 font-mono text-xs"></textarea>
                     </div>
                 </div>
                 <div class="flex justify-between mt-6">
                     <div class="space-x-2">
                         <button @click="copyJsonToClipboard" class="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50">Kopieren</button>
-                        <button @click="importFromJson" class="px-4 py-2 border border-blue-500 text-blue-600 rounded hover:bg-blue-50">Importieren</button>
+                        <button @click="importFromJson" class="px-4 py-2 border border-blue-500 text-blue-600 rounded hover:bg-blue-50">JSON Importieren</button>
                     </div>
                     <button @click="showImportExportModal = false" class="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300">Schließen</button>
                 </div>
@@ -720,6 +1059,41 @@
                 </div>
             </div>
         </div>
+
+        <!-- Batch-Eingabe Modal -->
+        <div v-if="showBatchInputModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div class="bg-white rounded-lg shadow-xl p-6 w-[600px]">
+                <h3 class="text-lg font-semibold mb-4">Mehrere Elemente hinzufügen</h3>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm text-gray-600 mb-1">Ziel-Gruppe</label>
+                        <select v-model="batchInputGruppe" class="w-full border border-gray-300 rounded px-3 py-2 text-sm bg-white">
+                            <option value="">-- Keine Gruppe --</option>
+                            <option v-for="g in sortedGruppen" :key="g.id" :value="g.id">{{ g.name }}</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm text-gray-600 mb-1">Elemente (eine Zeile pro Element)</label>
+                        <textarea v-model="batchInputText" rows="10" class="w-full border border-gray-300 rounded px-3 py-2 font-mono text-xs"
+                                  placeholder="phase;Analyse;2025-01-01;2025-01-31;gruen
+phase;Konzeption;2025-02-01;2025-02-28;rot;14;ja
+meilenstein;Kickoff;2025-01-15"></textarea>
+                    </div>
+                    <div class="text-xs text-gray-500 bg-gray-50 p-3 rounded">
+                        <strong>Format:</strong><br>
+                        Phase: <code>phase;Name;Start;Ende;Farbe;Puffer;Kritisch</code><br>
+                        Meilenstein: <code>meilenstein;Name;Datum</code><br><br>
+                        <strong>Farben:</strong> gruen, rot, dunkelrot<br>
+                        <strong>Datum:</strong> YYYY-MM-DD oder DD.MM.YYYY<br>
+                        <strong>Kritisch:</strong> ja oder leer lassen
+                    </div>
+                </div>
+                <div class="flex justify-end space-x-3 mt-6">
+                    <button @click="showBatchInputModal = false" class="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50">Abbrechen</button>
+                    <button @click="processBatchInput" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Hinzufügen</button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -733,6 +1107,17 @@
             const currentProjectId = ref(null);
             const activeTab = ref('projekt');
 
+            // Elemente-Ansicht State
+            const elementeView = ref('kompakt'); // 'kompakt' oder 'tabelle'
+            const expandedElementId = ref(null);
+            const collapsedGroups = ref(new Set());
+
+            // Panel Resize State
+            const editorPanelWidth = ref(380);
+            const isResizing = ref(false);
+            const minPanelWidth = 280;
+            const maxPanelWidth = 600;
+
             // Drag & Drop State
             const draggedElement = ref(null);
             const dragOverId = ref(null);
@@ -744,6 +1129,16 @@
             const jsonDataInput = ref('');
             const timelineContainer = ref(null);
             const timelineSvg = ref(null);
+
+            // Batch-Eingabe State
+            const showBatchInputModal = ref(false);
+            const batchInputText = ref('');
+            const batchInputGruppe = ref('');
+
+            // Präsentations-Ansichten
+            const darkMode = ref(false);
+            const showExecutiveSummary = ref(false);
+            const verticalMode = ref(false);
 
             const rowHeight = 28;
             const labelWidth = 280;
@@ -759,6 +1154,20 @@
                 rot: '#991B1B',
                 dunkelrot: '#450a0a'
             };
+
+            // Theme-Farben (Hell/Dunkel)
+            const themeColors = computed(() => ({
+                background: darkMode.value ? '#1F2937' : '#F9FAFB',
+                headerBg: darkMode.value ? '#374151' : '#F3F4F6',
+                rowEven: darkMode.value ? '#111827' : '#FFFFFF',
+                rowOdd: darkMode.value ? '#1F2937' : '#FAFAFA',
+                textPrimary: darkMode.value ? '#F3F4F6' : '#374151',
+                textSecondary: darkMode.value ? '#9CA3AF' : '#6B7280',
+                gridLine: darkMode.value ? '#4B5563' : '#E5E7EB',
+                border: darkMode.value ? '#6B7280' : '#D1D5DB',
+                milestone: darkMode.value ? '#F87171' : '#991B1B',
+                todayBg: darkMode.value ? '#DC2626' : '#991B1B'
+            }));
 
             // Computed
             const currentProject = computed(() => {
@@ -912,9 +1321,20 @@
                 return rows;
             });
 
+            // Executive Summary Filter
+            const displayRows = computed(() => {
+                if (!showExecutiveSummary.value) return timelineRows.value;
+                return timelineRows.value.filter(row => {
+                    if (row.type === 'gruppe') return true;
+                    if (row.type === 'meilenstein') return true;
+                    if (row.type === 'phase' && (row.einrueckung || 0) === 0) return true;
+                    return false;
+                });
+            });
+
             const canvasHeight = computed(() => {
                 const legendeHeight = currentProject.value?.einstellungen.legendeAnzeigen ? 0 : 0;
-                return 48 + timelineRows.value.length * rowHeight + 20;
+                return 48 + displayRows.value.length * rowHeight + 20;
             });
 
             const yearPeriods = computed(() => {
@@ -994,6 +1414,96 @@
                 return getDateX(new Date());
             });
 
+            // Vertikale Roadmap - Dimensionen
+            const verticalCanvasWidth = 700;
+            const verticalHeaderHeight = 60;
+            const verticalCanvasHeight = computed(() => {
+                if (!verticalMode.value || !projectDuration.value.days) return 600;
+                return verticalHeaderHeight + projectDuration.value.days * pixelsPerDay.value + 100;
+            });
+
+            // Vertikale Zeitperioden (Monate als horizontale Marker)
+            const verticalTimePeriods = computed(() => {
+                if (!currentProject.value || !projectDuration.value.start) return [];
+                const periods = [];
+                const { start, end } = projectDuration.value;
+                const scale = currentProject.value.einstellungen.zeitskala;
+                const monthNames = ['JAN', 'FEB', 'MÄR', 'APR', 'MAI', 'JUN', 'JUL', 'AUG', 'SEP', 'OKT', 'NOV', 'DEZ'];
+                let current = new Date(start.getFullYear(), start.getMonth(), 1);
+
+                while (current <= end) {
+                    let label, nextDate;
+                    if (scale === 'quartal') {
+                        const quarter = Math.floor(current.getMonth() / 3) + 1;
+                        label = `Q${quarter} ${current.getFullYear()}`;
+                        nextDate = new Date(current);
+                        nextDate.setMonth(nextDate.getMonth() + 3);
+                    } else {
+                        label = `${monthNames[current.getMonth()]} ${current.getFullYear()}`;
+                        nextDate = new Date(current);
+                        nextDate.setMonth(nextDate.getMonth() + 1);
+                    }
+                    const y = getDateY(current);
+                    const height = getDateY(nextDate) - y;
+                    periods.push({ label, y, height });
+                    current = nextDate;
+                }
+                return periods;
+            });
+
+            // Vertikale Timeline-Elemente (mit Seiten-Zuweisung)
+            const verticalElements = computed(() => {
+                if (!currentProject.value) return [];
+                const elements = [];
+                let leftSide = true; // Alterniert zwischen links und rechts
+
+                for (const gruppe of sortedGruppen.value) {
+                    // Gruppe-Header
+                    elements.push({
+                        type: 'gruppe',
+                        name: gruppe.name,
+                        side: 'center'
+                    });
+
+                    const gruppenElemente = sortedElemente.value.filter(e => e.gruppe === gruppe.id);
+                    for (const element of gruppenElemente) {
+                        if (showExecutiveSummary.value) {
+                            if (element.typ === 'phase' && (element.einrueckung || 0) > 0) continue;
+                        }
+
+                        if (element.typ === 'phase') {
+                            const startY = getDateY(element.start);
+                            const endY = getDateY(element.ende);
+                            elements.push({
+                                type: 'phase',
+                                name: element.name,
+                                startY: startY,
+                                height: Math.max(endY - startY, 20),
+                                color: colors[element.farbe] || colors.rot,
+                                kritisch: element.kritisch,
+                                pufferHeight: (element.pufferTage || 0) * pixelsPerDay.value,
+                                side: leftSide ? 'left' : 'right'
+                            });
+                            leftSide = !leftSide;
+                        } else {
+                            elements.push({
+                                type: 'meilenstein',
+                                name: element.name,
+                                y: getDateY(element.datum),
+                                side: leftSide ? 'left' : 'right'
+                            });
+                            leftSide = !leftSide;
+                        }
+                    }
+                }
+                return elements;
+            });
+
+            const todayY = computed(() => {
+                if (!currentProject.value || !verticalMode.value) return -1;
+                return getDateY(new Date());
+            });
+
             // Watch for modal open to update JSON
             watch(showImportExportModal, (newVal) => {
                 if (newVal && currentProject.value) {
@@ -1017,6 +1527,13 @@
                 const d = typeof date === 'string' ? new Date(date) : date;
                 const daysDiff = (d - projectDuration.value.start) / (1000 * 60 * 60 * 24);
                 return labelWidth + daysDiff * pixelsPerDay.value;
+            }
+
+            function getDateY(date) {
+                if (!projectDuration.value.start) return verticalHeaderHeight;
+                const d = typeof date === 'string' ? new Date(date) : date;
+                const daysDiff = (d - projectDuration.value.start) / (1000 * 60 * 60 * 24);
+                return verticalHeaderHeight + daysDiff * pixelsPerDay.value;
             }
 
             function getMilestonePoints(cx, cy) {
@@ -1331,6 +1848,59 @@
                     });
                 }
                 saveToStorage();
+                // Auto-expand new element in compact view
+                expandedElementId.value = currentProject.value.elemente[currentProject.value.elemente.length - 1].id;
+            }
+
+            // Element-Ansicht Funktionen
+            function toggleElementExpand(elementId) {
+                expandedElementId.value = expandedElementId.value === elementId ? null : elementId;
+            }
+
+            function toggleGroupCollapse(gruppeId) {
+                if (collapsedGroups.value.has(gruppeId)) {
+                    collapsedGroups.value.delete(gruppeId);
+                } else {
+                    collapsedGroups.value.add(gruppeId);
+                }
+            }
+
+            function isGroupCollapsed(gruppeId) {
+                return collapsedGroups.value.has(gruppeId);
+            }
+
+            function getElementSummary(element) {
+                if (element.typ === 'phase') {
+                    return `${formatDateShort(element.start)} - ${formatDateShort(element.ende)}`;
+                } else {
+                    return formatDateShort(element.datum);
+                }
+            }
+
+            // Panel Resize Funktionen
+            function startResize(event) {
+                isResizing.value = true;
+                document.addEventListener('mousemove', doResize);
+                document.addEventListener('mouseup', stopResize);
+                document.body.style.cursor = 'col-resize';
+                document.body.style.userSelect = 'none';
+            }
+
+            function doResize(event) {
+                if (!isResizing.value) return;
+                const sidebar = document.querySelector('.sidebar-width');
+                if (!sidebar) return;
+                const sidebarRect = sidebar.getBoundingClientRect();
+                const newWidth = event.clientX - sidebarRect.left;
+                editorPanelWidth.value = Math.max(minPanelWidth, Math.min(maxPanelWidth, newWidth));
+            }
+
+            function stopResize() {
+                isResizing.value = false;
+                document.removeEventListener('mousemove', doResize);
+                document.removeEventListener('mouseup', stopResize);
+                document.body.style.cursor = '';
+                document.body.style.userSelect = '';
             }
 
             function moveElement(element, direction) {
@@ -1355,6 +1925,117 @@
                     currentProject.value.elemente.splice(index, 1);
                     saveToStorage();
                 }
+            }
+
+            function duplicateElement(element) {
+                if (!currentProject.value) return;
+                const copy = JSON.parse(JSON.stringify(element));
+                copy.id = generateId();
+                copy.name = element.name + ' (Kopie)';
+                copy.reihenfolge = Math.max(0, ...currentProject.value.elemente.map(e => e.reihenfolge)) + 1;
+                currentProject.value.elemente.push(copy);
+                saveToStorage();
+            }
+
+            // Batch-Eingabe
+            function openBatchInput() {
+                batchInputText.value = '';
+                batchInputGruppe.value = sortedGruppen.value[0]?.id || '';
+                showBatchInputModal.value = true;
+            }
+
+            function parseDate(dateStr) {
+                if (!dateStr) return null;
+                // Try YYYY-MM-DD format
+                if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+                    return dateStr;
+                }
+                // Try DD.MM.YYYY format
+                const match = dateStr.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+                if (match) {
+                    const [_, day, month, year] = match;
+                    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+                }
+                return null;
+            }
+
+            function processBatchInput() {
+                if (!currentProject.value || !batchInputText.value.trim()) return;
+
+                const lines = batchInputText.value.trim().split('\n');
+                let addedCount = 0;
+                const errors = [];
+
+                for (let i = 0; i < lines.length; i++) {
+                    const line = lines[i].trim();
+                    if (!line) continue;
+
+                    const parts = line.split(';').map(p => p.trim());
+                    const typ = parts[0]?.toLowerCase();
+
+                    if (typ === 'phase') {
+                        // phase;Name;Start;Ende;Farbe;Puffer;Kritisch
+                        const name = parts[1] || 'Neue Phase';
+                        const start = parseDate(parts[2]);
+                        const ende = parseDate(parts[3]);
+                        const farbe = ['gruen', 'rot', 'dunkelrot'].includes(parts[4]) ? parts[4] : 'rot';
+                        const puffer = parseInt(parts[5]) || 0;
+                        const kritisch = parts[6]?.toLowerCase() === 'ja';
+
+                        if (!start || !ende) {
+                            errors.push(`Zeile ${i + 1}: Ungültiges Datum für Phase "${name}"`);
+                            continue;
+                        }
+
+                        const nextOrder = Math.max(0, ...currentProject.value.elemente.map(e => e.reihenfolge)) + 1;
+                        currentProject.value.elemente.push({
+                            id: generateId(),
+                            typ: 'phase',
+                            name: name,
+                            gruppe: batchInputGruppe.value,
+                            einrueckung: 0,
+                            start: start,
+                            ende: ende,
+                            kritisch: kritisch,
+                            pufferTage: puffer,
+                            farbe: farbe,
+                            reihenfolge: nextOrder
+                        });
+                        addedCount++;
+                    } else if (typ === 'meilenstein' || typ === 'ms') {
+                        // meilenstein;Name;Datum
+                        const name = parts[1] || 'Neuer Meilenstein';
+                        const datum = parseDate(parts[2]);
+
+                        if (!datum) {
+                            errors.push(`Zeile ${i + 1}: Ungültiges Datum für Meilenstein "${name}"`);
+                            continue;
+                        }
+
+                        const nextOrder = Math.max(0, ...currentProject.value.elemente.map(e => e.reihenfolge)) + 1;
+                        currentProject.value.elemente.push({
+                            id: generateId(),
+                            typ: 'meilenstein',
+                            name: name,
+                            gruppe: batchInputGruppe.value,
+                            einrueckung: 0,
+                            datum: datum,
+                            reihenfolge: nextOrder
+                        });
+                        addedCount++;
+                    } else if (typ) {
+                        errors.push(`Zeile ${i + 1}: Unbekannter Typ "${typ}"`);
+                    }
+                }
+
+                saveToStorage();
+                showBatchInputModal.value = false;
+
+                let message = `${addedCount} Element(e) hinzugefügt.`;
+                if (errors.length > 0) {
+                    message += '\n\nFehler:\n' + errors.join('\n');
+                }
+                alert(message);
             }
 
             // Drag & Drop Funktionen
@@ -1532,6 +2213,223 @@
                 }
             }
 
+            // CSV Import
+            function handleCsvFileSelect(event) {
+                const file = event.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    importFromCsv(e.target.result);
+                };
+                reader.readAsText(file);
+                event.target.value = ''; // Reset file input
+            }
+
+            function importFromCsv(csvContent) {
+                if (!csvContent.trim()) return;
+
+                // Detect delimiter (semicolon or comma)
+                const firstLine = csvContent.split('\n')[0];
+                const delimiter = firstLine.includes(';') ? ';' : ',';
+
+                const lines = csvContent.trim().split('\n');
+                if (lines.length < 2) {
+                    alert('CSV muss mindestens eine Kopfzeile und eine Datenzeile enthalten');
+                    return;
+                }
+
+                // Parse header
+                const header = lines[0].split(delimiter).map(h => h.trim().toLowerCase());
+                const requiredCols = ['typ', 'name'];
+                for (const col of requiredCols) {
+                    if (!header.includes(col)) {
+                        alert(`CSV fehlt erforderliche Spalte: ${col}`);
+                        return;
+                    }
+                }
+
+                // Build column index map
+                const colIndex = {};
+                header.forEach((col, idx) => colIndex[col] = idx);
+
+                // Create new project
+                const today = new Date();
+                const newProject = {
+                    id: generateId(),
+                    projekt: {
+                        name: 'CSV Import',
+                        beschreibung: '',
+                        start: '',
+                        ende: ''
+                    },
+                    gruppen: [],
+                    elemente: [],
+                    einstellungen: {
+                        heuteAnzeigen: true,
+                        legendeAnzeigen: true,
+                        zeitskala: 'monat',
+                        farbNamen: {
+                            gruen: 'Vorbereitung',
+                            rot: 'Plandauer',
+                            dunkelrot: 'Kritisch'
+                        }
+                    }
+                };
+
+                // Track groups by name
+                const gruppenMap = {};
+                let minDate = null;
+                let maxDate = null;
+                let orderCounter = 1;
+                const errors = [];
+
+                // First pass: create groups
+                for (let i = 1; i < lines.length; i++) {
+                    const line = lines[i].trim();
+                    if (!line) continue;
+
+                    const parts = line.split(delimiter).map(p => p.trim());
+                    const typ = (parts[colIndex['typ']] || '').toLowerCase();
+                    const name = parts[colIndex['name']] || '';
+
+                    if (typ === 'gruppe' && name) {
+                        if (!gruppenMap[name]) {
+                            const gruppeId = generateId();
+                            gruppenMap[name] = gruppeId;
+                            newProject.gruppen.push({
+                                id: gruppeId,
+                                name: name,
+                                reihenfolge: newProject.gruppen.length + 1
+                            });
+                        }
+                    }
+                }
+
+                // Second pass: create elements
+                for (let i = 1; i < lines.length; i++) {
+                    const line = lines[i].trim();
+                    if (!line) continue;
+
+                    const parts = line.split(delimiter).map(p => p.trim());
+                    const typ = (parts[colIndex['typ']] || '').toLowerCase();
+                    const name = parts[colIndex['name']] || '';
+                    const gruppeName = parts[colIndex['gruppe']] || '';
+                    const gruppeId = gruppenMap[gruppeName] || '';
+
+                    if (typ === 'phase') {
+                        const startStr = parts[colIndex['start']] || '';
+                        const endeStr = parts[colIndex['ende']] || '';
+                        const start = parseDate(startStr);
+                        const ende = parseDate(endeStr);
+
+                        if (!start || !ende) {
+                            errors.push(`Zeile ${i + 1}: Ungültiges Datum für Phase "${name}"`);
+                            continue;
+                        }
+
+                        const farbe = ['gruen', 'rot', 'dunkelrot'].includes(parts[colIndex['farbe']])
+                            ? parts[colIndex['farbe']] : 'rot';
+                        const puffer = parseInt(parts[colIndex['puffer']]) || 0;
+                        const kritisch = (parts[colIndex['kritisch']] || '').toLowerCase() === 'ja';
+                        const einrueckung = parseInt(parts[colIndex['einrückung']] || parts[colIndex['einrueckung']]) || 0;
+
+                        newProject.elemente.push({
+                            id: generateId(),
+                            typ: 'phase',
+                            name: name,
+                            gruppe: gruppeId,
+                            einrueckung: Math.min(2, Math.max(0, einrueckung)),
+                            start: start,
+                            ende: ende,
+                            kritisch: kritisch,
+                            pufferTage: puffer,
+                            farbe: farbe,
+                            reihenfolge: orderCounter++
+                        });
+
+                        // Track min/max dates
+                        const startDate = new Date(start);
+                        const endDate = new Date(ende);
+                        if (!minDate || startDate < minDate) minDate = startDate;
+                        if (!maxDate || endDate > maxDate) maxDate = endDate;
+
+                    } else if (typ === 'meilenstein' || typ === 'ms') {
+                        const datumStr = parts[colIndex['start']] || parts[colIndex['datum']] || '';
+                        const datum = parseDate(datumStr);
+
+                        if (!datum) {
+                            errors.push(`Zeile ${i + 1}: Ungültiges Datum für Meilenstein "${name}"`);
+                            continue;
+                        }
+
+                        const einrueckung = parseInt(parts[colIndex['einrückung']] || parts[colIndex['einrueckung']]) || 0;
+
+                        newProject.elemente.push({
+                            id: generateId(),
+                            typ: 'meilenstein',
+                            name: name,
+                            gruppe: gruppeId,
+                            einrueckung: Math.min(2, Math.max(0, einrueckung)),
+                            datum: datum,
+                            reihenfolge: orderCounter++
+                        });
+
+                        const datumDate = new Date(datum);
+                        if (!minDate || datumDate < minDate) minDate = datumDate;
+                        if (!maxDate || datumDate > maxDate) maxDate = datumDate;
+                    }
+                }
+
+                // Set project dates
+                if (minDate && maxDate) {
+                    newProject.projekt.start = minDate.toISOString().split('T')[0];
+                    // Add some buffer to end date
+                    maxDate.setDate(maxDate.getDate() + 30);
+                    newProject.projekt.ende = maxDate.toISOString().split('T')[0];
+                } else {
+                    newProject.projekt.start = today.toISOString().split('T')[0];
+                    const endDate = new Date(today);
+                    endDate.setFullYear(endDate.getFullYear() + 1);
+                    newProject.projekt.ende = endDate.toISOString().split('T')[0];
+                }
+
+                // Add project
+                projects.value.push(newProject);
+                currentProjectId.value = newProject.id;
+                saveToStorage();
+                showImportExportModal.value = false;
+
+                let message = `CSV-Import erfolgreich!\n${newProject.gruppen.length} Gruppe(n), ${newProject.elemente.length} Element(e) erstellt.`;
+                if (errors.length > 0) {
+                    message += '\n\nWarnungen:\n' + errors.slice(0, 5).join('\n');
+                    if (errors.length > 5) {
+                        message += `\n... und ${errors.length - 5} weitere`;
+                    }
+                }
+                alert(message);
+            }
+
+            function downloadCsvTemplate() {
+                const template = `Typ;Name;Gruppe;Start;Ende;Farbe;Puffer;Kritisch;Einrückung
+gruppe;Phasenplan;;;;;;;;
+phase;Analyse;Phasenplan;2025-01-01;2025-01-31;gruen;0;nein;0
+phase;Konzeption;Phasenplan;2025-02-01;2025-02-28;rot;14;ja;1
+meilenstein;Kickoff;Phasenplan;2025-01-15;;;;;0
+gruppe;Workstreams;;;;;;;;
+phase;Stream A;Workstreams;2025-01-01;2025-03-31;gruen;0;nein;0`;
+
+                const blob = new Blob([template], { type: 'text/csv;charset=utf-8;' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = 'timeline_vorlage.csv';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+            }
+
             // Lifecycle
             onMounted(() => {
                 loadFromStorage();
@@ -1547,6 +2445,11 @@
                 currentProject,
                 currentProjectId,
                 activeTab,
+                elementeView,
+                expandedElementId,
+                collapsedGroups,
+                editorPanelWidth,
+                isResizing,
                 sortedGruppen,
                 sortedElemente,
                 usedColors,
@@ -1571,6 +2474,19 @@
                 jsonDataInput,
                 timelineContainer,
                 timelineSvg,
+                showBatchInputModal,
+                batchInputText,
+                batchInputGruppe,
+                darkMode,
+                showExecutiveSummary,
+                verticalMode,
+                themeColors,
+                displayRows,
+                verticalCanvasWidth,
+                verticalCanvasHeight,
+                verticalTimePeriods,
+                verticalElements,
+                todayY,
                 formatDateShort,
                 getElementeForGruppe,
                 getMilestonePoints,
@@ -1588,8 +2504,16 @@
                 moveGruppe,
                 deleteGruppe,
                 addElement,
+                toggleElementExpand,
+                toggleGroupCollapse,
+                isGroupCollapsed,
+                getElementSummary,
+                startResize,
                 moveElement,
                 deleteElement,
+                duplicateElement,
+                openBatchInput,
+                processBatchInput,
                 onDragStart,
                 onDragOver,
                 onDragLeave,
@@ -1598,6 +2522,8 @@
                 exportTimeline,
                 copyJsonToClipboard,
                 importFromJson,
+                handleCsvFileSelect,
+                downloadCsvTemplate,
                 saveToStorage
             };
         }
