@@ -8,7 +8,7 @@
 
 A powerful, browser-based timeline generator for project management and transition planning. Create professional Gantt-style timelines without any server or installation required.
 
-![Timeline Generator Preview](docs/preview.png)
+![Timeline Generator Preview](docs/screenshot-main.png)
 
 ---
 
@@ -40,8 +40,8 @@ A powerful, browser-based timeline generator for project management and transiti
 
 ### Option 2: Clone Repository
 ```bash
-git clone https://github.com/YOUR_USERNAME/timeline-generator.git
-cd timeline-generator
+git clone https://github.com/xela-io/PM-Timeline-Generator.git
+cd PM-Timeline-Generator
 # Open index.html in your browser
 ```
 
