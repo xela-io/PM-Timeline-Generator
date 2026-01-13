@@ -27,6 +27,11 @@ A powerful, browser-based timeline generator for project management and transiti
 - **Critical Path** — Highlight critical milestones
 - **Buffer Visualization** — Show time reserves as dashed lines
 - **Persistent Storage** — Auto-saves to browser's LocalStorage
+- **Dark Mode** — Professional dark theme for presentations
+- **Executive Summary** — Filter view showing only main phases and milestones
+- **Vertical Roadmap** — Modern centered timeline with alternating elements
+- **CSV Import** — Import timeline data from Excel/CSV files
+- **Batch Input** — Add multiple elements at once
 - **German UI** — Interface in German (contributions for i18n welcome!)
 
 ---
@@ -56,6 +61,18 @@ No build tools, no dependencies, no setup required.
 
 ### Main Interface
 ![Main Interface](docs/screenshot-main.png)
+
+### Dark Mode
+![Dark Mode](docs/screenshot-dark-mode.png)
+
+### Vertical Roadmap
+![Vertical Roadmap](docs/screenshot-vertical-roadmap.png)
+
+### Table View (Editor)
+![Table View](docs/screenshot-table-view.png)
+
+### Import/Export
+![Import Export](docs/screenshot-import-export.png)
 
 ### Timeline View
 ![Timeline View](docs/screenshot-timeline.png)
@@ -135,7 +152,6 @@ Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for gu
 
 ### Ideas for Contributions
 - Internationalization (i18n) for English UI
-- Dark mode theme
 - Dependency arrows between phases
 - Undo/redo functionality
 - Keyboard shortcuts
